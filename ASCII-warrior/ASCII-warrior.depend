@@ -1,0 +1,11 @@
+# depslib dependency file v1.0
+1764706543 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\main.cpp
+	<iostream>
+	<ctime>
+	<characters.h>
+	<conio.h>
+
+1764703761 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\characters.cpp
+
+1764705177 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\characters.h
+
