@@ -8,7 +8,6 @@ using namespace std;
 Player player;
 clock_t lastFrameTime;
 
-unsigned int **board;
 const int height = 31;
 const int width = 101;
 
@@ -74,18 +73,7 @@ void PrintFullBoard()
     {
         for(int x = 0; x<width; x++)
         {
-            switch(board[x][y])
-            {
-                case air:
-                    cout<<" ";
-                    break;
-                case barrier:
-                    cout<<"#";
-                    break;
-                case player_index:
-                    cout<<"@";
-                    break;
-            }
+            PrintObject(board[x][y]);
         }
         cout<<endl;
     }
@@ -129,9 +117,9 @@ int main()
     GameSetup();
     PrintFullBoard();
 
-    GravityStep(&gravityPull, board, &player);
     while(true)
     {
+        GravityStep(&gravityPull, &player);
     }
 
     return 0;

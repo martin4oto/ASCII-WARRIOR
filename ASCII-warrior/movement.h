@@ -4,6 +4,7 @@
 
 void SetCursorPosition(Vector2 *position)
 {
+    //coment ts
     HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 
     COORD coordinates =
@@ -17,11 +18,16 @@ void SetCursorPosition(Vector2 *position)
 
 void MoveObject(Vector2 *moveFrom, Vector2 *moveTo)
 {
+    unsigned int objectToMove = board[moveFrom->x][moveFrom->y];
+
     SetCursorPosition(moveFrom);
-    std::cout<<"A";
+    PrintObject(air);
+
+    SetCursorPosition(moveTo);
+    PrintObject(objectToMove);
 }
 
-void GravityStep(Vector2 *gravityScale, unsigned int** board, Player* playerObject)
+void GravityStep(Vector2 *gravityScale, Player* playerObject)
 {
     Vector2 *playerPosition = playerObject->position;
 
@@ -31,7 +37,6 @@ void GravityStep(Vector2 *gravityScale, unsigned int** board, Player* playerObje
     //there is nothing under the player
     if(board[playerMove->x][playerMove->y] != barrier)
     {
-
         //check for colision
         //TODO
         MoveObject(playerPosition,playerMove);
