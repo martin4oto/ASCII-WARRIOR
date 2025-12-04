@@ -1,11 +1,18 @@
 # depslib dependency file v1.0
-1764706543 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\main.cpp
+1764862261 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\main.cpp
 	<iostream>
 	<ctime>
-	<characters.h>
 	<conio.h>
+	<movement.h>
 
 1764703761 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\characters.cpp
 
-1764705177 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\characters.h
+1764859892 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\characters.h
+
+1764712365 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\objects.h
+
+1764862978 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\movement.h
+	<characters.h>
+	<objects.h>
+	<windows.h>
 

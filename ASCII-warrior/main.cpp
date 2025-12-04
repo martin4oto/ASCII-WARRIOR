@@ -1,8 +1,7 @@
 #include <iostream>
 #include <ctime>
-#include <characters.h>
 #include <conio.h>
-#include <objects.h>
+#include <movement.h>
 
 using namespace std;
 
@@ -10,18 +9,37 @@ Player player;
 clock_t lastFrameTime;
 
 unsigned int **board;
-const int height = 29;
-const int width = 100;
+const int height = 31;
+const int width = 101;
+
+Vector2 gravityPull;
 
 void ClearBoard()
 {
-    for(int i = 0; i<height; i++)
+    for(int i = 0; i<width; i++)
     {
-        for(int j = 0; j<width; j++)
+        for(int j = 0; j<height; j++)
         {
             board[i][j] = 0;
         }
     }
+}
+
+void AddPlayer()
+{
+    player.HP = 5;
+
+    Vector2 *playerPosition = new Vector2;
+
+    player.position = playerPosition;
+
+    int X = (int)(width/2) +1;
+    int Y = (int)(height/2) +1;
+
+    playerPosition->x = X;
+    playerPosition->y = Y;
+
+    board[X][Y] = player_index;
 }
 
 void PutBorrder()
@@ -29,16 +47,16 @@ void PutBorrder()
     //top and down
     for(int i = 0; i<width; i++)
     {
-        board[0][i] = 1;
-        board[height-1][i] = 1;
+        board[i][0] = 1;
+        board[i][height-1] = 1;
     }
 
 
     //left and right
     for(int i = 0; i<height; i++)
     {
-        board[i][0] = 1;
-        board[i][width-1] = 1;
+        board[0][i] = 1;
+        board[width-1][i] = 1;
     }
 }
 
@@ -52,17 +70,20 @@ void PrintFullBoard()
 {
     PrintHeader();
 
-    for(int i = 0; i<height; i++)
+    for(int y = 0; y<height; y++)
     {
-        for(int j = 0; j<width; j++)
+        for(int x = 0; x<width; x++)
         {
-            switch(board[i][j])
+            switch(board[x][y])
             {
                 case air:
                     cout<<" ";
                     break;
                 case barrier:
                     cout<<"#";
+                    break;
+                case player_index:
+                    cout<<"@";
                     break;
             }
         }
@@ -88,22 +109,30 @@ float GetDeltaTime()
 
 void GameSetup()
 {
-    player.HP = 5;
+    board = new unsigned int*[width];
 
-    board = new unsigned int*[height];
-
-    for(int i = 0; i < height; i++)
+    for(int i = 0; i < width; i++)
     {
-        board[i] = new unsigned int[width];
+        board[i] = new unsigned int[height];
     }
     ClearBoard();
     PutBorrder();
+    AddPlayer();
+
+    gravityPull.x = 0;
+    gravityPull.y = 1;
 }
 
 int main()
 {
-    system("MODE CON COLS=100 LINES=40");
+    system("MODE CON COLS=101 LINES=40");
     GameSetup();
     PrintFullBoard();
+
+    GravityStep(&gravityPull, board, &player);
+    while(true)
+    {
+    }
+
     return 0;
 }

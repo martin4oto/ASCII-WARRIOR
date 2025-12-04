@@ -31,8 +31,12 @@
 		<Compiler>
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
+			<Add directory="C:/projects/ASCII-warrior/ASCII-WARRIOR/ASCII-warrior/" />
 		</Compiler>
+		<Unit filename="characters.h" />
 		<Unit filename="main.cpp" />
+		<Unit filename="movement.h" />
+		<Unit filename="objects.h" />
 		<Extensions />
 	</Project>
 </CodeBlocks_project_file>
