@@ -6,12 +6,14 @@
 using namespace std;
 
 Player player;
-clock_t lastFrameTime;
+clock_t lastFrameTime = 0;
 
 const int height = 31;
 const int width = 101;
 
 Vector2 gravityPull;
+Vector2 vector_left;
+Vector2 vector_right;
 
 void ClearBoard()
 {
@@ -82,7 +84,12 @@ void PrintFullBoard()
 char GetInput()
 {
     //TODO better
-    return _getch();
+    if(_kbhit())
+    {
+        return _getch();
+    }
+
+    return 0;
 }
 
 float GetDeltaTime()
@@ -90,9 +97,11 @@ float GetDeltaTime()
     clock_t current_time = clock();
 
     //time between the last frame and the new one
-    float delta = (lastFrameTime-current_time)/(float)CLOCKS_PER_SEC;
+    float delta = current_time-lastFrameTime;
 
     lastFrameTime = current_time;
+
+    return delta;
 }
 
 void GameSetup()
@@ -109,6 +118,28 @@ void GameSetup()
 
     gravityPull.x = 0;
     gravityPull.y = 1;
+    vector_left.x = -1;
+    vector_left.y = 0;
+    vector_right.x = 1;
+    vector_right.y = 0;
+}
+
+void InputManager(char input)
+{
+    if(input == 0) return;
+
+    if(input == 'a')
+    {
+        MovePlayer(vector_left, &player);
+    }
+    else if(input == 'd')
+    {
+        MovePlayer(vector_right, &player);
+    }
+    else if(input == ' ' && player.jumpsLeft)
+    {
+        PlayerJump();
+    }
 }
 
 int main()
@@ -116,10 +147,22 @@ int main()
     system("MODE CON COLS=101 LINES=40");
     GameSetup();
     PrintFullBoard();
+    float timer = 0;
+    timer += GetDeltaTime();
 
     while(true)
     {
         GravityStep(&gravityPull, &player);
+
+        char input = GetInput();
+        InputManager(input);
+
+        while(timer<=150)
+        {
+            float delta = GetDeltaTime();
+            timer += delta;
+        }
+        timer = 0;
     }
 
     return 0;

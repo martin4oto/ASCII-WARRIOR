@@ -11,13 +11,18 @@ void PrintObject(unsigned int objectToPrint)
     switch(objectToPrint)
     {
     case air:
-        cout<<" ";
+        putch(' ');
         break;
     case barrier:
-        cout<<"#";
+        putch('#');
         break;
     case player_index:
-        cout<<"@";
+        putch('@');
         break;
     }
+}
+
+bool isEmpty(int x, int y)
+{
+    return !board[x][y];
 }
