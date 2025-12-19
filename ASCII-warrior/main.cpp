@@ -8,23 +8,9 @@ using namespace std;
 Player player;
 clock_t lastFrameTime = 0;
 
-const int height = 31;
-const int width = 101;
-
 Vector2 gravityPull;
 Vector2 vector_left;
 Vector2 vector_right;
-
-void ClearBoard()
-{
-    for(int i = 0; i<width; i++)
-    {
-        for(int j = 0; j<height; j++)
-        {
-            board[i][j] = 0;
-        }
-    }
-}
 
 void AddPlayer()
 {
@@ -41,24 +27,6 @@ void AddPlayer()
     playerPosition->y = Y;
 
     board[X][Y] = player_index;
-}
-
-void PutBorrder()
-{
-    //top and down
-    for(int i = 0; i<width; i++)
-    {
-        board[i][0] = 1;
-        board[i][height-1] = 1;
-    }
-
-
-    //left and right
-    for(int i = 0; i<height; i++)
-    {
-        board[0][i] = 1;
-        board[width-1][i] = 1;
-    }
 }
 
 void PrintHeader()
@@ -112,8 +80,7 @@ void GameSetup()
     {
         board[i] = new unsigned int[height];
     }
-    ClearBoard();
-    PutBorrder();
+    GenerateMap();
     AddPlayer();
 
     gravityPull.x = 0;
@@ -136,9 +103,9 @@ void InputManager(char input)
     {
         MovePlayer(vector_right, &player);
     }
-    else if(input == ' ' && player.jumpsLeft)
+    else if(input == 'w')
     {
-        PlayerJump();
+        PlayerJump(&player);
     }
 }
 

@@ -2,20 +2,36 @@
 #include <objects.h>
 #include <windows.h>
 
-//returns the free spaces that are <= to the iterations
-int CheckForVerticalSpace(Vector2 *startingPosition, int iterations, int direction)
+const int jumpHeight = -5;
+const int maxJumps = 2;
+
+
+int sign(int number)
+{
+    int signBit = ((number & (1<<31))>>31);
+
+    return signBit?-1:1;
+}
+
+//returns the free spaces that are <= to the abs(iterations)
+//if the next position is not ocupied, then the function should retun a number grater than abs(iterations)
+int CheckForVerticalSpace(Vector2 *startingPosition, int iterations)
 {
     int x = startingPosition->x;
     int y = startingPosition->y;
 
-    for(int i = 0; i<iterations; i++)
+    int direction = sign(iterations);
+    iterations *= direction;
+
+    for(int i = 1; i<=iterations+1; i++)
     {
-        if(!isEmpty(x,y + (i*direction)))
+        if(!isEmpty(x,
+                    y + (i*direction)))
         {
-            return i;
+            return i-1;
         }
     }
-    return iterations;
+    return iterations + 1;
 }
 
 void SetCursorPosition(Vector2 *position)
@@ -73,16 +89,47 @@ int MovePlayer(Vector2 direction, Player* playerObject)
 
 void GravityStep(Vector2 *gravityPull,Player *player)
 {
-    Vector2 momentum = player->verticalMomentum;
+    //TODO: make into diff functions
+    Vector2 *momentum = &player->verticalMomentum;
 
-    AddVectorsDirectly(&momentum, gravityPull);
+    AddVectorsDirectly(momentum, gravityPull);
+
+    int freePosibleSpaces = CheckForVerticalSpace(
+                            player->position,
+                            momentum->y);
+
+    int scalarMomentum = momentum->y;
+
+    if(freePosibleSpaces == 0||scalarMomentum == 0)
+    {
+        ZeroVector(momentum);
+        return;
+    }
 
 
+    if(freePosibleSpaces>scalarMomentum)
+    {
+        player->verticalMomentum.y = scalarMomentum;
+    }
+    else
+    {
+        if(sign(momentum->y) == 1)
+        {
+            player->jumpsLeft = maxJumps;
+        }
+        player->verticalMomentum.y = freePosibleSpaces;
+    }
 
     MovePlayer(player->verticalMomentum, player);
 }
 
-void PlayerJump()
+void PlayerJump(Player* playerObject)
 {
+    if(!(playerObject->jumpsLeft))
+    {
+        return;
+    }
 
+    playerObject->verticalMomentum.y = jumpHeight;
+    playerObject->jumpsLeft--;
 }
