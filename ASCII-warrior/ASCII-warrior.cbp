@@ -35,6 +35,7 @@
 		</Compiler>
 		<Unit filename="characters.h" />
 		<Unit filename="main.cpp" />
+		<Unit filename="mapGeneration.h" />
 		<Unit filename="movement.h" />
 		<Unit filename="objects.h" />
 		<Extensions />

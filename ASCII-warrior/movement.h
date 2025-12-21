@@ -1,5 +1,5 @@
 #include <characters.h>
-#include <objects.h>
+#include <mapGeneration.h>
 #include <windows.h>
 
 const int jumpHeight = -5;
@@ -8,9 +8,14 @@ const int maxJumps = 2;
 
 int sign(int number)
 {
-    int signBit = ((number & (1<<31))>>31);
+    int signBit = number & (1<<31);
 
     return signBit?-1:1;
+}
+
+int Abs(int number)
+{
+    return number*sign(number);
 }
 
 //returns the free spaces that are <= to the abs(iterations)
@@ -28,6 +33,7 @@ int CheckForVerticalSpace(Vector2 *startingPosition, int iterations)
         if(!isEmpty(x,
                     y + (i*direction)))
         {
+            //cout<<i-1;
             return i-1;
         }
     }
@@ -68,6 +74,7 @@ int MovePlayer(Vector2 direction, Player* playerObject)
 
     //calculate where the player should move
     Vector2* playerMove = AddVectors(playerPosition, &direction);
+    //cout<<playerPosition->y;
 
     //there is nothing under the player
     if(board[playerMove->x][playerMove->y] != barrier)
@@ -100,24 +107,33 @@ void GravityStep(Vector2 *gravityPull,Player *player)
 
     int scalarMomentum = momentum->y;
 
-    if(freePosibleSpaces == 0||scalarMomentum == 0)
+
+    if(freePosibleSpaces == 0)
     {
         ZeroVector(momentum);
+        if(sign(scalarMomentum) == 1)
+        {
+            player->jumpsLeft = maxJumps;
+        }
         return;
     }
 
+    if(scalarMomentum == 0) return;
 
-    if(freePosibleSpaces>scalarMomentum)
+    //cout<<freePosibleSpaces<<momentum->y;
+    //cout<<endl<<endl<<freePosibleSpaces;
+
+    if(freePosibleSpaces>Abs(scalarMomentum))
     {
         player->verticalMomentum.y = scalarMomentum;
     }
     else
     {
-        if(sign(momentum->y) == 1)
+        if(sign(scalarMomentum) == 1)
         {
             player->jumpsLeft = maxJumps;
         }
-        player->verticalMomentum.y = freePosibleSpaces;
+        player->verticalMomentum.y = freePosibleSpaces * sign(scalarMomentum);
     }
 
     MovePlayer(player->verticalMomentum, player);

@@ -1,7 +1,14 @@
+#include <cstdlib>
+#include <objects.h>
+
 unsigned int **board;
 
 const int height = 31;
 const int width = 101;
+const int numberOfPlatforms = 9;
+
+const int minPlatformSize = 5;
+const int maxPlatformSize = 20;
 
 void ClearBoard()
 {
@@ -34,11 +41,34 @@ void PutBorrder()
 
 void putPlatforms()
 {
+    //why not random???
+    for(int i = 0; i < numberOfPlatforms; i++)
+    {
+        int x = 1 + (rand()%(width-5));
+        int y = 1 + (rand()%(height-2));
 
+        int platformSize = minPlatformSize + (rand()%(maxPlatformSize - minPlatformSize));
+
+        for(int j = 0; j<platformSize;j++)
+        {
+            if(x + j >= width)
+            {
+                break;
+            }
+            board[x + j][y] = platform;
+        }
+    }
 }
 
 void GenerateMap()
 {
     ClearBoard();
     PutBorrder();
+    putPlatforms();
+}
+
+
+bool isEmpty(int x, int y)
+{
+    return !board[x][y];
 }

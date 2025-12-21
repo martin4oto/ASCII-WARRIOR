@@ -15,8 +15,8 @@ struct Player
 
 struct Enemy
 {
-    int HP;
     char visual;
+    int HP;
 };
 
 Vector2* AddVectors(Vector2 *v1, Vector2 *v2)

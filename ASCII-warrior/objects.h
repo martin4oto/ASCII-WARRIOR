@@ -1,5 +1,3 @@
-#include <mapGeneration.h>
-
 using namespace std;
 
 const unsigned int air = 0;
@@ -24,9 +22,4 @@ void PrintObject(unsigned int objectToPrint)
         cout<<'@';
         break;
     }
-}
-
-bool isEmpty(int x, int y)
-{
-    return !board[x][y];
 }
