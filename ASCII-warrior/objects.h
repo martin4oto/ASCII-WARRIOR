@@ -4,6 +4,7 @@ const char air = 0;
 const char barrier = 1;
 const char platform = 2;
 const char player_index = 3;
+const char walker_object = 4;
 
 void PrintObject(char objectToPrint)
 {
@@ -20,6 +21,9 @@ void PrintObject(char objectToPrint)
         break;
     case player_index:
         cout<<'@';
+        break;
+    case walker_object:
+        cout<<'E';
         break;
     }
 }

@@ -35,6 +35,7 @@
 		</Compiler>
 		<Unit filename="attackHandling.h" />
 		<Unit filename="characters.h" />
+		<Unit filename="enemies.h" />
 		<Unit filename="main.cpp" />
 		<Unit filename="mapGeneration.h" />
 		<Unit filename="movement.h" />

@@ -1,3 +1,11 @@
+int enemyTypeCount = 1;
+
+enum EnemyTypes
+{
+    Walker
+};
+
+
 struct Vector2
 {
     int x;
@@ -13,17 +21,20 @@ struct Animation
 
 struct Player
 {
-    char visual;
     int jumpsLeft;
     int HP;
     Vector2 *position;
     Vector2 verticalMomentum;
 };
 
+//extraInfo:
+//(walker): extraInfo-walking direction
 struct Enemy
 {
-    char visual;
+    EnemyTypes type;
     int HP;
+    Vector2 position;
+    int extraInfo;
 };
 
 

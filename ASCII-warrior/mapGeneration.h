@@ -1,6 +1,12 @@
 #include <cstdlib>
 #include <objects.h>
 
+Vector2 vector_down;
+Vector2 vector_up;
+Vector2 vector_left;
+Vector2 vector_right;
+Vector2 vector_zero;
+
 char **board;
 
 const int height = 31;
@@ -39,19 +45,24 @@ void PutBorrder()
     }
 }
 
+int GenerateRandom(int minimum, int maximum)
+{
+    return minimum + (rand()%(maximum - minimum+1));
+}
+
 void putPlatforms()
 {
     //why not random???
     for(int i = 0; i < numberOfPlatforms; i++)
     {
-        int x = 1 + (rand()%(width-5));
-        int y = 1 + (rand()%(height-2));
+        int x = GenerateRandom(1, width-2);
+        int y = GenerateRandom(1, height-2);
 
-        int platformSize = minPlatformSize + (rand()%(maxPlatformSize - minPlatformSize));
+        int platformSize = GenerateRandom(minPlatformSize, maxPlatformSize);
 
         for(int j = 0; j<platformSize;j++)
         {
-            if(x + j >= width)
+            if(x + j >= width-1)
             {
                 break;
             }
@@ -76,6 +87,17 @@ bool isEmpty(int x, int y)
 bool isEmptyOrEnemy(int x, int y)
 {
     return board[x][y] != platform && board[x][y] != barrier;
+}
+
+bool canStand(Vector2 position)
+{
+    Vector2 tileUnder =
+    {
+        position.x,
+        position.y+1
+    };
+
+    return !isEmptyOrEnemy(tileUnder.x, tileUnder.y)&&isEmpty(position.x, position.y);
 }
 
 

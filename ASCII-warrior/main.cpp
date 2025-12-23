@@ -1,7 +1,7 @@
 #include <iostream>
 #include <ctime>
 #include <conio.h>
-#include <movement.h>
+#include <enemies.h>
 
 using namespace std;
 
@@ -79,6 +79,8 @@ void GameSetup()
     GenerateMap();
     AddPlayer();
 
+    enemiesAlive = new Enemy[maxEnemiesAllowed];
+
     vector_down.x = 0;
     vector_down.y = 1;
     vector_left.x = -1;
@@ -87,6 +89,8 @@ void GameSetup()
     vector_right.y = 0;
     vector_up.x = 0;
     vector_up.y = -1;
+    vector_zero.x = 0;
+    vector_zero.y = 0;
 }
 
 void InputManager(char input)
@@ -127,6 +131,9 @@ int main()
 {
     system("MODE CON COLS=101 LINES=40");
     GameSetup();
+
+    SpawnEnemy();
+
     PrintFullBoard();
     float timer = 0;
     timer += GetDeltaTime();
@@ -137,6 +144,8 @@ int main()
         InputManager(input);
 
         GravityStep(&vector_down, &player);
+
+        EnemiesStep();
 
         while(timer<=150)
         {

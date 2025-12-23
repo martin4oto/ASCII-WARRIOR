@@ -1,11 +1,6 @@
 #include <mapGeneration.h>
 #include <windows.h>
 
-Vector2 vector_down;
-Vector2 vector_up;
-Vector2 vector_left;
-Vector2 vector_right;
-
 void SetCursorPosition(Vector2 *position)
 {
     //coment ts
