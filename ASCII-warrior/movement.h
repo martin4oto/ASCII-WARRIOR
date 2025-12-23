@@ -1,6 +1,5 @@
 #include <characters.h>
-#include <mapGeneration.h>
-#include <windows.h>
+#include <attackHandling.h>
 
 const int jumpHeight = -5;
 const int maxJumps = 2;
@@ -40,19 +39,6 @@ int CheckForVerticalSpace(Vector2 *startingPosition, int iterations)
     return iterations + 1;
 }
 
-void SetCursorPosition(Vector2 *position)
-{
-    //coment ts
-    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    COORD coordinates =
-    {
-         (position -> x),
-         (position -> y)+1
-    };
-
-    SetConsoleCursorPosition(hStdOut, coordinates);
-}
 
 void MoveObject(Vector2 *moveFrom, Vector2 *moveTo)
 {
@@ -68,16 +54,16 @@ void MoveObject(Vector2 *moveFrom, Vector2 *moveTo)
     board[moveFrom->x][moveFrom->y] = air;
 }
 
-int MovePlayer(Vector2 direction, Player* playerObject)
+int MovePlayer(Vector2 *direction, Player* playerObject)
 {
     Vector2 *playerPosition = playerObject->position;
 
     //calculate where the player should move
-    Vector2* playerMove = AddVectors(playerPosition, &direction);
+    Vector2* playerMove = AddVectors(playerPosition, direction);
     //cout<<playerPosition->y;
 
     //there is nothing under the player
-    if(board[playerMove->x][playerMove->y] != barrier)
+    if(isEmptyOrEnemy(playerMove->x, playerMove->y))
     {
         //check for colision
         //TODO
@@ -136,7 +122,7 @@ void GravityStep(Vector2 *gravityPull,Player *player)
         player->verticalMomentum.y = freePosibleSpaces * sign(scalarMomentum);
     }
 
-    MovePlayer(player->verticalMomentum, player);
+    MovePlayer(&player->verticalMomentum, player);
 }
 
 void PlayerJump(Player* playerObject)

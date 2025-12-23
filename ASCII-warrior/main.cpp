@@ -8,10 +8,6 @@ using namespace std;
 Player player;
 clock_t lastFrameTime = 0;
 
-Vector2 gravityPull;
-Vector2 vector_left;
-Vector2 vector_right;
-
 void AddPlayer()
 {
     player.HP = 5;
@@ -74,21 +70,23 @@ float GetDeltaTime()
 
 void GameSetup()
 {
-    board = new unsigned int*[width];
+    board = new char*[width];
 
     for(int i = 0; i < width; i++)
     {
-        board[i] = new unsigned int[height];
+        board[i] = new char[height];
     }
     GenerateMap();
     AddPlayer();
 
-    gravityPull.x = 0;
-    gravityPull.y = 1;
+    vector_down.x = 0;
+    vector_down.y = 1;
     vector_left.x = -1;
     vector_left.y = 0;
     vector_right.x = 1;
     vector_right.y = 0;
+    vector_up.x = 0;
+    vector_up.y = -1;
 }
 
 void InputManager(char input)
@@ -97,15 +95,31 @@ void InputManager(char input)
 
     if(input == 'a')
     {
-        MovePlayer(vector_left, &player);
+        MovePlayer(&vector_left, &player);
     }
     else if(input == 'd')
     {
-        MovePlayer(vector_right, &player);
+        MovePlayer(&vector_right, &player);
     }
     else if(input == 'w')
     {
         PlayerJump(&player);
+    }
+    else if(input == 'i')
+    {
+        tryAttacking(AttackDirections::up, &player);
+    }
+    else if(input == 'k')
+    {
+        tryAttacking(AttackDirections::down, &player);
+    }
+    else if(input == 'l')
+    {
+        tryAttacking(AttackDirections::right, &player);
+    }
+    else if(input == 'j')
+    {
+        tryAttacking(AttackDirections::left, &player);
     }
 }
 
@@ -119,15 +133,16 @@ int main()
 
     while(true)
     {
-        GravityStep(&gravityPull, &player);
-
         char input = GetInput();
         InputManager(input);
+
+        GravityStep(&vector_down, &player);
 
         while(timer<=150)
         {
             float delta = GetDeltaTime();
             timer += delta;
+            AnimatinStep(delta);
         }
         timer = 0;
     }

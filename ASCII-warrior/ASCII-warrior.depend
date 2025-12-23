@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1766153046 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\main.cpp
+1766497153 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\main.cpp
 	<iostream>
 	<ctime>
 	<conio.h>
@@ -7,16 +7,19 @@
 
 1764703761 source:c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\characters.cpp
 
-1766172860 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\characters.h
+1766492023 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\characters.h
 
-1766157003 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\objects.h
+1766494329 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\objects.h
 
-1766162873 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\movement.h
+1766319321 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\movement.h
 	<characters.h>
-	<mapGeneration.h>
-	<windows.h>
+	<attackHandling.h>
 
-1766314204 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\mapgeneration.h
+1766494459 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\mapgeneration.h
 	<cstdlib>
 	<objects.h>
+
+1766498038 c:\projects\ascii-warrior\ascii-warrior\ascii-warrior\\attackhandling.h
+	<mapGeneration.h>
+	<windows.h>
 

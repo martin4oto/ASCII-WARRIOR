@@ -33,6 +33,7 @@
 			<Add option="-fexceptions" />
 			<Add directory="C:/projects/ASCII-warrior/ASCII-WARRIOR/ASCII-warrior/" />
 		</Compiler>
+		<Unit filename="attackHandling.h" />
 		<Unit filename="characters.h" />
 		<Unit filename="main.cpp" />
 		<Unit filename="mapGeneration.h" />

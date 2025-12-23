@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <objects.h>
 
-unsigned int **board;
+char **board;
 
 const int height = 31;
 const int width = 101;
@@ -71,4 +71,15 @@ void GenerateMap()
 bool isEmpty(int x, int y)
 {
     return !board[x][y];
+}
+
+bool isEmptyOrEnemy(int x, int y)
+{
+    return board[x][y] != platform && board[x][y] != barrier;
+}
+
+
+void PrintObject(Vector2 *position)
+{
+    PrintObject(board[position->x][position->y]);
 }

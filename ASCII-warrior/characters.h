@@ -4,6 +4,13 @@ struct Vector2
     int y;
 };
 
+struct Animation
+{
+    int duration;
+    Vector2 position;
+    char *output;
+};
+
 struct Player
 {
     char visual;
@@ -19,6 +26,29 @@ struct Enemy
     int HP;
 };
 
+
+Animation *CreateAnimation(Vector2 position, char* out, int duration)
+{
+    Animation *finished = new Animation;
+
+    *finished ={
+        duration,
+        position,
+        out
+    };
+
+    return finished;
+}
+
+Animation CreateAnimationValue(Vector2 position, char* out, int duration)
+{
+    return {
+        duration,
+        position,
+        out
+    };
+}
+
 Vector2* AddVectors(Vector2 *v1, Vector2 *v2)
 {
     Vector2 *result = new Vector2;
@@ -33,11 +63,6 @@ void AddVectorsDirectly(Vector2 *v1, Vector2 *v2)
 {
     v1->x += v2->x;
     v1->y += v2->y;
-}
-
-bool AreVectorsEqual(Vector2 *v1, Vector2 *v2)
-{
-    return (v1->x==v2->x)&&(v1->y==v2->y);
 }
 
 void  ZeroVector(Vector2 *v)

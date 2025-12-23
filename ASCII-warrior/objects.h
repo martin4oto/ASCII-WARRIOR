@@ -1,11 +1,11 @@
 using namespace std;
 
-const unsigned int air = 0;
-const unsigned int barrier = 1;
-const unsigned int platform = 2;
-const unsigned int player_index = 3;
+const char air = 0;
+const char barrier = 1;
+const char platform = 2;
+const char player_index = 3;
 
-void PrintObject(unsigned int objectToPrint)
+void PrintObject(char objectToPrint)
 {
     switch(objectToPrint)
     {
