@@ -5,8 +5,9 @@
 
 using namespace std;
 
-Player player;
 clock_t lastFrameTime = 0;
+
+const int numberOfWaves = 3;
 
 void AddPlayer()
 {
@@ -27,6 +28,9 @@ void AddPlayer()
 
 void PrintHeader()
 {
+    Vector2 v = {0,-1};
+
+    SetCursorPosition(&v);
     cout<<"HP: "<<player.HP;
     cout<<endl;
 }
@@ -70,11 +74,11 @@ float GetDeltaTime()
 
 void GameSetup()
 {
-    board = new char*[width];
+    board = new unsigned char*[width];
 
     for(int i = 0; i < width; i++)
     {
-        board[i] = new char[height];
+        board[i] = new unsigned char[height];
     }
     GenerateMap();
     AddPlayer();
@@ -99,11 +103,11 @@ void InputManager(char input)
 
     if(input == 'a')
     {
-        MovePlayer(&vector_left, &player);
+        MovePlayer(&vector_left, player.position);
     }
     else if(input == 'd')
     {
-        MovePlayer(&vector_right, &player);
+        MovePlayer(&vector_right, player.position);
     }
     else if(input == 'w')
     {
@@ -132,29 +136,38 @@ int main()
     system("MODE CON COLS=101 LINES=40");
     GameSetup();
 
-    SpawnEnemy();
+    int curWaveNumber = initialWaveNumber;
 
-    PrintFullBoard();
-    float timer = 0;
-    timer += GetDeltaTime();
-
-    while(true)
+    for(int i = 0; i<numberOfWaves; i++)
     {
-        char input = GetInput();
-        InputManager(input);
+        SpawnWave(curWaveNumber);
 
-        GravityStep(&vector_down, &player);
+        PrintFullBoard();
+        float timer = 0;
+        timer += GetDeltaTime();
 
-        EnemiesStep();
-
-        while(timer<=150)
+        while(true)
         {
-            float delta = GetDeltaTime();
-            timer += delta;
-            AnimatinStep(delta);
-        }
-        timer = 0;
-    }
+            char input = GetInput();
+            InputManager(input);
 
+            GravityStep(&vector_down, &player.verticalMomentum, player.position, player.jumpsLeft);
+            MovePlayer(&player.verticalMomentum, player.position);
+
+            EnemiesStep();
+
+            if(currentEnemiesAlive == 0)break;
+
+            while(timer<=150)
+            {
+                float delta = GetDeltaTime();
+                timer += delta;
+                AnimatinStep(delta);
+            }
+            timer = 0;
+        }
+
+        curWaveNumber += GenerateRandom(3,5);
+    }
     return 0;
 }

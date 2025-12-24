@@ -1,19 +1,4 @@
 #include <mapGeneration.h>
-#include <windows.h>
-
-void SetCursorPosition(Vector2 *position)
-{
-    //coment ts
-    HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-
-    COORD coordinates =
-    {
-         (position -> x),
-         (position -> y)+1
-    };
-
-    SetConsoleCursorPosition(hStdOut, coordinates);
-}
 
 enum AttackDirections
 {
@@ -97,6 +82,8 @@ void PrintAnimation(Animation *animation)
     }
 }
 
+void CheckForHits(AttackDirections, Vector2);
+
 void tryAttacking(AttackDirections attack, Player *playerObject)
 {
     if(attackTimer < timeBetweenAttacks)
@@ -141,6 +128,8 @@ void tryAttacking(AttackDirections attack, Player *playerObject)
 
     PrintAnimation(&ongoingAnimations[animationCount]);
 
+    CheckForHits(attack,animationPosition);
+
     animationCount++;
 }
 
@@ -155,5 +144,36 @@ void AnimatinStep(int delta)
         {
             RemoveAnimation(i);
         }
+    }
+}
+
+void RemoveEnemy(int);
+
+void CheckForHits(AttackDirections direction, Vector2 position)
+{
+    Vector2 *direction_vector;
+
+    switch(direction)
+    {
+    case AttackDirections::up:
+    case AttackDirections::down:
+        direction_vector = &vector_up;
+        break;
+    case AttackDirections::left:
+    case AttackDirections::right:
+        direction_vector = &vector_down;
+        break;
+    }
+
+    for(int i = 0; i<3; i++)
+    {
+        unsigned char hit;
+
+        if(hit = isEnemy(&position))
+        {
+            RemoveEnemy(hit-5);
+        }
+
+        AddVectorsDirectly(&position, direction_vector);
     }
 }

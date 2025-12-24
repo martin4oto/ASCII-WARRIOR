@@ -39,9 +39,13 @@ int CheckForVerticalSpace(Vector2 *startingPosition, int iterations)
     return iterations + 1;
 }
 
+void RemoveEnemy(int);
+
 
 void MoveObject(Vector2 *moveFrom, Vector2 *moveTo)
 {
+    if(AreEqual(moveFrom, moveTo))return;
+
     unsigned int objectToMove = board[moveFrom->x][moveFrom->y];
 
     SetCursorPosition(moveFrom);
@@ -50,14 +54,36 @@ void MoveObject(Vector2 *moveFrom, Vector2 *moveTo)
     SetCursorPosition(moveTo);
     PrintObject(objectToMove);
 
-    board[moveTo->x][moveTo->y] = objectToMove;
     board[moveFrom->x][moveFrom->y] = air;
+    board[moveTo->x][moveTo->y] = objectToMove;
 }
 
-int MovePlayer(Vector2 *direction, Player* playerObject)
+bool MoveEnemy(Vector2 *direction, Vector2* position)
 {
-    Vector2 *playerPosition = playerObject->position;
+    if(AreEqual(direction, &vector_zero))return 1;
+    //calculate where the player should move
+    Vector2* enemyMove = AddVectors(position, direction);
+    //cout<<playerPosition->y;
 
+    //there is nothing under the player
+    if(isEmpty(enemyMove->x, enemyMove->y))
+    {
+        MoveObject(position,enemyMove);
+
+        *position = *enemyMove;
+        delete[] enemyMove;
+        return true;
+    }
+    else
+    {
+        delete[] enemyMove;
+        return false;
+    }
+}
+
+int MovePlayer(Vector2 *direction, Vector2* playerPosition)
+{
+    if(AreEqual(direction, &vector_zero))return 1;
     //calculate where the player should move
     Vector2* playerMove = AddVectors(playerPosition, direction);
     //cout<<playerPosition->y;
@@ -66,11 +92,17 @@ int MovePlayer(Vector2 *direction, Player* playerObject)
     if(isEmptyOrEnemy(playerMove->x, playerMove->y))
     {
         //check for colision
-        //TODO
+        unsigned char boardValue;
+        if(boardValue = isEnemy(playerMove))
+        {
+            RemoveEnemy(boardValue-5);
+        }
+
+
         MoveObject(playerPosition,playerMove);
 
-        playerObject->position = playerMove;
-        delete[] playerPosition;
+        *playerPosition = *playerMove;
+        delete[] playerMove;
         return 0;
     }
     else
@@ -80,15 +112,12 @@ int MovePlayer(Vector2 *direction, Player* playerObject)
     }
 }
 
-void GravityStep(Vector2 *gravityPull,Player *player)
+void GravityStep(Vector2 *gravityPull,Vector2 *momentum, Vector2 *position, int &jumpsLeft)
 {
-    //TODO: make into diff functions
-    Vector2 *momentum = &player->verticalMomentum;
-
     AddVectorsDirectly(momentum, gravityPull);
 
     int freePosibleSpaces = CheckForVerticalSpace(
-                            player->position,
+                            position,
                             momentum->y);
 
     int scalarMomentum = momentum->y;
@@ -99,7 +128,7 @@ void GravityStep(Vector2 *gravityPull,Player *player)
         ZeroVector(momentum);
         if(sign(scalarMomentum) == 1)
         {
-            player->jumpsLeft = maxJumps;
+            jumpsLeft = maxJumps;
         }
         return;
     }
@@ -111,18 +140,16 @@ void GravityStep(Vector2 *gravityPull,Player *player)
 
     if(freePosibleSpaces>Abs(scalarMomentum))
     {
-        player->verticalMomentum.y = scalarMomentum;
+        momentum->y = scalarMomentum;
     }
     else
     {
         if(sign(scalarMomentum) == 1)
         {
-            player->jumpsLeft = maxJumps;
+            jumpsLeft = maxJumps;
         }
-        player->verticalMomentum.y = freePosibleSpaces * sign(scalarMomentum);
+        momentum->y = freePosibleSpaces * sign(scalarMomentum);
     }
-
-    MovePlayer(&player->verticalMomentum, player);
 }
 
 void PlayerJump(Player* playerObject)

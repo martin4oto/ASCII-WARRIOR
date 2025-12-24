@@ -1,8 +1,14 @@
-int enemyTypeCount = 1;
+int enemyTypeCount = 4;
+int bossTypes = 1;
 
 enum EnemyTypes
 {
-    Walker
+    Walker,
+    Crawler,
+    Flier,
+    Jumper,
+
+    Boss
 };
 
 
@@ -25,16 +31,6 @@ struct Player
     int HP;
     Vector2 *position;
     Vector2 verticalMomentum;
-};
-
-//extraInfo:
-//(walker): extraInfo-walking direction
-struct Enemy
-{
-    EnemyTypes type;
-    int HP;
-    Vector2 position;
-    int extraInfo;
 };
 
 
@@ -60,6 +56,11 @@ Animation CreateAnimationValue(Vector2 position, char* out, int duration)
     };
 }
 
+bool AreEqual(Vector2 *v1, Vector2 *v2)
+{
+    return v1->x==v2->x && v1->y==v2->y;
+}
+
 Vector2* AddVectors(Vector2 *v1, Vector2 *v2)
 {
     Vector2 *result = new Vector2;
@@ -80,4 +81,10 @@ void  ZeroVector(Vector2 *v)
 {
     v->x = 0;
     v->y = 0;
+}
+
+int Abs(int);
+int RoughDistance(Vector2 *v1, Vector2 *v2)
+{
+    return Abs(v1->x-v2->x) + Abs(v1->y-v2->y);
 }
