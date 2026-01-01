@@ -81,6 +81,9 @@ bool MoveEnemy(Vector2 *direction, Vector2* position)
     }
 }
 
+bool CollideWithEnemy(int);
+void DamagePlayer(int);
+
 int MovePlayer(Vector2 *direction, Vector2* playerPosition)
 {
     if(AreEqual(direction, &vector_zero))return 1;
@@ -95,7 +98,13 @@ int MovePlayer(Vector2 *direction, Vector2* playerPosition)
         unsigned char boardValue;
         if(boardValue = isEnemy(playerMove))
         {
-            RemoveEnemy(boardValue-5);
+            bool canGo = CollideWithEnemy(boardValue-5);
+            DamagePlayer(1);
+            if(!canGo)
+            {
+                delete[] playerMove;
+                return 1;
+            }
         }
 
 
@@ -161,4 +170,98 @@ void PlayerJump(Player* playerObject)
 
     playerObject->verticalMomentum.y = jumpHeight;
     playerObject->jumpsLeft--;
+}
+
+//=====================================================
+
+void AdjustVectorToSize(Vector2 *v, int Size)
+{
+    for(int i = 0; i<Size/2; i++)
+    {
+        AddVectorsDirectly(v, &vector_up);
+        AddVectorsDirectly(v, &vector_left);
+    }
+}
+
+bool IsEmpty_Boss(Vector2 position, int Size)
+{
+    Vector2 current = position;
+
+    int xDirection = 1;
+    int yDirection = 1;
+
+    AdjustVectorToSize(&current, Size);
+
+    for(int i = 0; i < Size; i++)
+    {
+        for(int j = 0; j<Size;j++)
+        {
+            if(!isEmpty(&current))return false;
+
+            current.x += xDirection;
+        }
+
+        xDirection *= -1;
+        current.x += xDirection;
+        current.y += yDirection;
+    }
+
+    return true;
+}
+
+void ValidateSpecialPosition(Vector2 *position, int Size)
+{
+    int halfSize = Size/2;
+
+    if(position->x < 2+halfSize)
+    {
+        position->x = 2+halfSize;
+    }
+    else if(position->x > width-2-halfSize)
+    {
+        position->x = width-2-halfSize;
+    }
+
+    if(position->y < 2+halfSize)
+    {
+        position->y = 2+halfSize;
+    }
+    else if(position->y > height-2-halfSize)
+    {
+        position->y = height-2-halfSize;
+    }
+}
+
+void TeleportSpecial(Enemy *e, Vector2 *newPosition, int Size)
+{
+    ValidateSpecialPosition(newPosition, Size);
+
+    Vector2 moveFrom = e->position;
+    Vector2 moveTo = *newPosition;
+
+    e->position = moveTo;
+
+    AdjustVectorToSize(&moveFrom, Size);
+    AdjustVectorToSize(&moveTo, Size);
+
+    int xDirection = 1;
+    int yDirection = 1;
+
+    for(int i = 0; i < Size; i++)
+    {
+        for(int j = 0; j<Size;j++)
+        {
+            MoveObject(&moveFrom, &moveTo);
+
+            moveFrom.x += xDirection;
+            moveTo.x += xDirection;
+        }
+
+        xDirection *= -1;
+        moveFrom.x += xDirection;
+        moveTo.x += xDirection;
+
+        moveFrom.y += yDirection;
+        moveTo.y += yDirection;
+    }
 }

@@ -99,6 +99,11 @@ bool isEmpty(int x, int y)
     return !board[x][y];
 }
 
+bool isEmpty(Vector2 *position)
+{
+    return !board[position->x][position->y];
+}
+
 bool isEmptyOrEnemy(int x, int y)
 {
     return board[x][y] != platform && board[x][y] != barrier;

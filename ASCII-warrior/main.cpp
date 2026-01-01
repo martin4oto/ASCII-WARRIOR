@@ -131,6 +131,34 @@ void InputManager(char input)
     }
 }
 
+void GameLoop()
+{
+    PrintFullBoard();
+    float timer = 0;
+    timer += GetDeltaTime();
+
+    while(true)
+    {
+        char input = GetInput();
+        InputManager(input);
+
+        GravityStep(&vector_down, &player.verticalMomentum, player.position, player.jumpsLeft);
+        MovePlayer(&player.verticalMomentum, player.position);
+
+        EnemiesStep();
+
+        if(currentEnemiesAlive == 0)break;
+
+        while(timer<=150)
+        {
+            float delta = GetDeltaTime();
+            timer += delta;
+            AnimatinStep(delta);
+        }
+        timer = 0;
+    }
+}
+
 int main()
 {
     system("MODE CON COLS=101 LINES=40");
@@ -140,32 +168,9 @@ int main()
 
     for(int i = 0; i<numberOfWaves; i++)
     {
-        SpawnWave(curWaveNumber);
+        SpawnBoss();
 
-        PrintFullBoard();
-        float timer = 0;
-        timer += GetDeltaTime();
-
-        while(true)
-        {
-            char input = GetInput();
-            InputManager(input);
-
-            GravityStep(&vector_down, &player.verticalMomentum, player.position, player.jumpsLeft);
-            MovePlayer(&player.verticalMomentum, player.position);
-
-            EnemiesStep();
-
-            if(currentEnemiesAlive == 0)break;
-
-            while(timer<=150)
-            {
-                float delta = GetDeltaTime();
-                timer += delta;
-                AnimatinStep(delta);
-            }
-            timer = 0;
-        }
+        GameLoop();
 
         curWaveNumber += GenerateRandom(3,5);
     }

@@ -1,4 +1,14 @@
 #include <movement.h>
+
+int RoundUp(double number)
+{
+    int integerPart = (int)number;
+
+    return (number-integerPart)>0? integerPart+1: integerPart;
+}
+
+
+
 const int initialWaveNumber = 5;
 
 Player player;
@@ -49,6 +59,31 @@ const Enemy JumperBlueprint =
     nullptr
 };
 
+const Enemy BossBlueprint =
+{
+    'B',
+    EnemyTypes::Boss,
+    10,
+    vector_zero,
+    nullptr
+};
+
+AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
+{
+    enemiesAlive[currentEnemiesAlive] = *enemyToAdd;
+    int offset = enemySize/2;
+
+    for(int i = 0; i<enemySize; i++)
+    {
+        for(int j = 0; j<enemySize; j++)
+        {
+            board[enemyToAdd->position.x + i - offset][enemyToAdd->position.y + j - offset] = currentEnemiesAlive+5;
+        }
+    }
+
+    currentEnemiesAlive++;
+}
+
 void AddEnemy(Enemy* enemyToAdd)
 {
     enemiesAlive[currentEnemiesAlive] = *enemyToAdd;
@@ -73,6 +108,17 @@ void RemoveEnemy(int EnemyIndex)
     currentEnemiesAlive--;
 }
 
+bool CollideWithEnemy(int EnemyIndex)
+{
+    if(enemiesAlive[EnemyIndex].type == Boss)
+    {
+        return false;
+    }
+
+    RemoveEnemy(EnemyIndex);
+    return true;
+}
+
 void FindTheClosestFloor(Vector2 *position)
 {
     while(!canStand(*position))
@@ -92,6 +138,20 @@ Vector2 GetRandomEmptyVector()
         };
     }
     while(!isEmpty(v.x, v.y));
+    return v;
+}
+
+Vector2 GetRandomEmptyVector(int Size)
+{
+    Vector2 v;
+    do
+    {
+        v = {
+            GenerateRandom(1, width-2),
+            GenerateRandom(1, height-2)
+        };
+    }
+    while(!IsEmpty_Boss(v, Size));
     return v;
 }
 
@@ -392,7 +452,71 @@ bool JumperStep(Enemy *enemy)
 //====================================================
 void SpawnBoss()
 {
+    Enemy boss = BossBlueprint;
 
+    boss.position = GetRandomEmptyVector(bossSize);
+    boss.extraInfo = new int[3]{0,0,0};
+
+    AddSpecialEnemy(&boss, bossSize);
+    cout<<currentEnemiesAlive;
+}
+
+const Animation bossWarning =
+{
+    1000,
+    vector_zero,
+    "!"
+};
+
+const int numOfWarnings = 20;
+bool BossTeleport(int &counter, Vector2 *positionToTP, Enemy *e)
+{
+    if(counter%10 == 0 && counter<=numOfWarnings)
+    {
+        Animation warning = bossWarning;
+        warning.position = *positionToTP;
+        AddAnimation(&warning);
+
+        counter++;
+        return false;
+    }
+    else if(counter>numOfWarnings)
+    {
+        TeleportSpecial(e, positionToTP, bossSize);
+        counter = 0;
+        *positionToTP = vector_zero;
+        return false;
+    }
+
+    counter++;
+    return false;
+}
+
+bool BossStep(Enemy *enemy)
+{
+    bool result = false;
+
+    Vector2 chosenPosition =
+    {
+        enemy->extraInfo[0],
+        enemy->extraInfo[1]
+    };
+    int counter = enemy->extraInfo[2];
+
+    if(!AreEqual(&chosenPosition, &vector_zero))
+    {
+        result = BossTeleport(counter, &chosenPosition, enemy);
+    }
+    else
+    {
+        chosenPosition = *player.position;
+        ValidateSpecialPosition(&chosenPosition, bossSize);
+    }
+
+    enemy->extraInfo[0] = chosenPosition.x;
+    enemy->extraInfo[1] = chosenPosition.y;
+    enemy->extraInfo[2] = counter;
+    return result;
 }
 //====================================================
 
@@ -457,5 +581,16 @@ void SpawnWave(int numOfEnemies)
     for(int i = 0; i<numOfEnemies; i++)
     {
         SpawnEnemy();
+    }
+}
+
+void DamageEnemy(int enemyIndex, int amount)
+{
+    Enemy *e = enemiesAlive + enemyIndex;
+    e->HP -= amount;
+
+    if(e->HP <= 0)
+    {
+        //DIE
     }
 }

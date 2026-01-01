@@ -84,6 +84,17 @@ void PrintAnimation(Animation *animation)
 
 void CheckForHits(AttackDirections, Vector2);
 
+void AddAnimation(Animation *animation)
+{
+    ongoingAnimations[animationCount] = *animation;
+    currentTime[animationCount] = 0;
+
+    PrintAnimation(&ongoingAnimations[animationCount]);
+
+    animationCount++;
+}
+
+
 void tryAttacking(AttackDirections attack, Player *playerObject)
 {
     if(attackTimer < timeBetweenAttacks)
@@ -123,14 +134,10 @@ void tryAttacking(AttackDirections attack, Player *playerObject)
 
     }
 
-    ongoingAnimations[animationCount] = CreateAnimationValue(animationPosition, animationOutput,attackDuration);
-    currentTime[animationCount] = 0;
-
-    PrintAnimation(&ongoingAnimations[animationCount]);
+    Animation ann = CreateAnimationValue(animationPosition, animationOutput,attackDuration);
+    AddAnimation(&ann);
 
     CheckForHits(attack,animationPosition);
-
-    animationCount++;
 }
 
 void AnimatinStep(int delta)

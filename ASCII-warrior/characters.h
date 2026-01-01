@@ -1,5 +1,6 @@
 int enemyTypeCount = 4;
 int bossTypes = 1;
+const int bossSize = 3;
 
 enum EnemyTypes
 {
