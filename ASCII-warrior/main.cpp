@@ -44,9 +44,11 @@ struct Enemy
 
 struct Animation
 {
+    bool collion;
     int duration;
     Vector2 position;
     char *output;
+    int *collisionFunction(int);
 };
 
 struct Player
@@ -57,16 +59,18 @@ struct Player
     Vector2 verticalMomentum;
 };
 //========================================================
+
+void PrintHeader();
+void CheckForHits(AttackDirections, Vector2);
+void RemoveEnemy(int);
+void DamageEnemy(int, int);
+
 Player player;
 
 clock_t lastFrameTime = 0;
 
 const int numberOfWaves = 3;
 const int initialWaveNumber = 5;
-
-void PrintHeader();
-void CheckForHits(AttackDirections, Vector2);
-void RemoveEnemy(int);
 
 int enemyTypeCount = 4;
 int bossTypes = 1;
@@ -120,6 +124,34 @@ const int crawlerDirectionYDefault = 0;
 const int jumpHeight = -5;
 const int maxJumps = 2;
 
+const int flierInfoSize = 1;
+
+const int maximumDistaceToJump = 5;
+const int jumpForceEnemyJumper = -3;
+
+const int jumperInfoSize = 4;
+
+const int JumperDirectionDefault = 1;
+const int JumperVelocityXDefault = 0;
+const int JumperVelocityYDefault = 0;
+const int JumperCanJumpDefault = 1;
+const int JumperDirectionIndex = 0;
+const int JumperVelocityXIndex = 1;
+const int JumperVelocityYIndex = 2;
+const int JumperCanJumpIndex = 3;
+
+int enemyIndexOffset = 5;
+
+const int playerDMG = 1;
+
+const Animation baseAnimation =
+{
+    false,
+    0,
+    vector_zero,
+    nullptr
+};
+
 //======================================================================================
 
 
@@ -128,6 +160,7 @@ Animation *CreateAnimation(Vector2 position, char* out, int duration)
     Animation *finished = new Animation;
 
     *finished ={
+        false,
         duration,
         position,
         out
@@ -139,6 +172,7 @@ Animation *CreateAnimation(Vector2 position, char* out, int duration)
 Animation CreateAnimationValue(Vector2 position, char* out, int duration)
 {
     return {
+        false,
         duration,
         position,
         out
@@ -200,7 +234,7 @@ void PrintObject(char objectToPrint)
 
     if(objectToPrint>4)
     {
-        cout<<enemiesAlive[objectToPrint-5].visual;
+        cout<<enemiesAlive[objectToPrint-enemyIndexOffset].visual;
     }
 }
 
@@ -302,29 +336,19 @@ bool isEmptyOrEnemy(int x, int y)
 
 bool canStand(Vector2 position)
 {
-    Vector2 tileUnder =
-    {
-        position.x,
-        position.y+1
-    };
+    Vector2 tileUnder =position;
+    AddVectorsDirectly(&tileUnder, &vector_down);
 
     return !isEmptyOrEnemy(tileUnder.x, tileUnder.y)&&isEmpty(position.x, position.y);
 }
 
-//to fix
 bool canStandorHang(Vector2 position)
 {
-    Vector2 tileUp =
-    {
-        position.x,
-        position.y - 1
-    };
+    Vector2 tileUp = position;
+    AddVectorsDirectly(&tileUp, &vector_up);
 
-    Vector2 tileDown =
-    {
-        position.x,
-        position.y + 1
-    };
+    Vector2 tileDown = position;
+    AddVectorsDirectly(&tileDown, &vector_down);
 
     return (!isEmptyOrEnemy(tileUp.x, tileUp.y)||
             !isEmptyOrEnemy(tileDown.x, tileDown.y))&&
@@ -333,17 +357,11 @@ bool canStandorHang(Vector2 position)
 
 bool canCrawl(Vector2 position)
 {
-    Vector2 tileLeft =
-    {
-        position.x - 1,
-        position.y
-    };
+    Vector2 tileLeft = position;
+    AddVectorsDirectly(&tileLeft,&vector_left);
 
-    Vector2 tileRight =
-    {
-        position.x + 1,
-        position.y
-    };
+    Vector2 tileRight = position;
+    AddVectorsDirectly(&tileRight,&vector_right);
 
     return (!isEmptyOrEnemy(tileLeft.x, tileLeft.y)||
             !isEmptyOrEnemy(tileRight.x, tileRight.y))&&
@@ -352,7 +370,7 @@ bool canCrawl(Vector2 position)
 
 unsigned char isEnemy(Vector2 *position)
 {
-    return board[position->x][position->y]>=4 ? board[position->x][position->y]:0;
+    return board[position->x][position->y]>=enemyIndexOffset ? board[position->x][position->y]:0;
 }
 
 void PrintObject(Vector2 *position)
@@ -410,7 +428,16 @@ void RemoveAnimation(int animationIndex)
         currentTime[i-1] = currentTime[i];
     }
 
+    delete[] animationToRemove;
     animationCount--;
+}
+
+void NewLine(Vector2 *currentPosition)
+{
+
+    currentPosition->y++;
+    currentPosition->x--;
+    SetCursorPosition(currentPosition);
 }
 
 void PrintAnimation(Animation *animation)
@@ -425,9 +452,7 @@ void PrintAnimation(Animation *animation)
     {
         if(*animationOutput =='\n')
         {
-            currentPosition.y++;
-            currentPosition.x--;
-            SetCursorPosition(&currentPosition);
+            NewLine(&currentPosition);
             animationOutput++;
             continue;
         }
@@ -490,8 +515,47 @@ void tryAttacking(AttackDirections attack, Player *playerObject)
 
     Animation ann = CreateAnimationValue(animationPosition, animationOutput,attackDuration);
     AddAnimation(&ann);
+}
 
-    CheckForHits(attack,animationPosition);
+void ExecuteAnimationCollision(Animation *animation, int colidedObject)
+{
+    (*animation).collisionFunction(colidedObject);
+}
+
+void CheckCollision(Animation *currentAnimation)
+{
+    Vector2 currentPosition = currentAnimation->position;
+    char* animationOutput = currentAnimation->output;
+
+    while(*animationOutput)
+    {
+        if(*animationOutput =='\n')
+        {
+            NewLine(&currentPosition);
+            animationOutput++;
+            continue;
+        }
+
+        if(*animationOutput != air)
+        {
+            ExecuteAnimationCollision(currentAnimation, *animationOutput);
+        }
+        currentPosition.x++;
+        animationOutput++;
+    }
+}
+
+void AnimationCollisionCheck()
+{
+    for(int i = 0; i<animationCount; i++)
+    {
+        Animation *currentAnimation = ongoingAnimations + i;
+
+        if(currentAnimation->collion)
+        {
+            CheckCollision(currentAnimation);
+        }
+    }
 }
 
 void AnimatinStep(int delta)
@@ -500,40 +564,12 @@ void AnimatinStep(int delta)
     for(int i = 0; i<animationCount; i++)
     {
         currentTime[i]+=delta;
+        Animation *currentAnimation = ongoingAnimations + i;
 
-        if(currentTime[i] > ongoingAnimations[i].duration)
+        if(currentTime[i] > currentAnimation->duration)
         {
             RemoveAnimation(i);
         }
-    }
-}
-
-void CheckForHits(AttackDirections direction, Vector2 position)
-{
-    Vector2 *direction_vector;
-
-    switch(direction)
-    {
-    case AttackDirections::up:
-    case AttackDirections::down:
-        direction_vector = &vector_up;
-        break;
-    case AttackDirections::left:
-    case AttackDirections::right:
-        direction_vector = &vector_down;
-        break;
-    }
-
-    for(int i = 0; i<3; i++)
-    {
-        unsigned char hit;
-
-        if(hit = isEnemy(&position))
-        {
-            RemoveEnemy(hit-5);
-        }
-
-        AddVectorsDirectly(&position, direction_vector);
     }
 }
 
@@ -1041,7 +1077,7 @@ void CrawlerGetNewDirection(Enemy *enemy)
         AddVectorsDirectly(&testPosition, &vector_left);
         if(canStandorHang(testPosition))
         {
-            enemy->extraInfo[0] = vector_left.x;
+            enemy->extraInfo[crawlerDirectionXIndex] = vector_left.x;
             enemy->extraInfo[crawlerDirectionYIndex] = vector_left.y;
             return;
         }
@@ -1066,8 +1102,8 @@ bool CrawerStep(Enemy *enemy)
     Vector2 *position = &enemy->position;
     Vector2 direction =
     {
-        enemy->extraInfo[0],
-        enemy->extraInfo[1]
+        enemy->extraInfo[crawlerDirectionXIndex],
+        enemy->extraInfo[crawlerDirectionYIndex]
     };
 
     Vector2 desiredPosition = direction;
@@ -1113,7 +1149,7 @@ void SpawnFlier()
 
     Enemy flier = FlierBlueprint;
     flier.position = initialPosition;
-    flier.extraInfo = new int(1);
+    flier.extraInfo = new int(flierInfoSize);
     AddEnemy(&flier);
 }
 
@@ -1179,7 +1215,6 @@ bool FlierStep(Enemy *enemy)
 }
 //==================================================
 
-
 void SpawnJumper()
 {
     Vector2 initialPosition = GetRandomEmptyVector();
@@ -1189,13 +1224,11 @@ void SpawnJumper()
     Enemy jumper = JumperBlueprint;
     jumper.position = initialPosition;
 
-    jumper.extraInfo = new int[4]{1,0,0,true};
+    jumper.extraInfo = new int[jumperInfoSize]{JumperDirectionDefault,JumperVelocityXDefault,JumperVelocityYDefault,JumperCanJumpDefault};
 
     AddEnemy(&jumper);
 }
 
-const int maximumDistaceToJump = 5;
-const int jumpForceEnemyJumper = -3;
 void TryToJump(Enemy *jumper, bool &canJump, Vector2 &velocity)
 {
     Vector2 *position = &jumper->position;
@@ -1209,15 +1242,16 @@ void TryToJump(Enemy *jumper, bool &canJump, Vector2 &velocity)
     }
 }
 
+
 bool JumperStep(Enemy *enemy)
 {
     Vector2 *position = &enemy->position;
-    int direction = *enemy->extraInfo;
+    int direction = enemy->extraInfo[JumperDirectionIndex];
     Vector2 velocity = {
-        enemy->extraInfo[1],
-        enemy->extraInfo[2]
+        enemy->extraInfo[JumperVelocityXIndex],
+        enemy->extraInfo[JumperVelocityYIndex]
     };
-    bool canJump = enemy->extraInfo[3];
+    bool canJump = enemy->extraInfo[JumperCanJumpIndex];
 
     Vector2 desiredPosition = *position;
     desiredPosition.x += direction;
@@ -1242,10 +1276,10 @@ bool JumperStep(Enemy *enemy)
     GravityStep(&vector_down, &velocity, position, (int&)canJump);
     MoveEnemy(&velocity, position);
 
-    enemy->extraInfo[0] = direction;
-    enemy->extraInfo[1] = velocity.x;
-    enemy->extraInfo[2] = velocity.y;
-    enemy->extraInfo[3] = canJump;
+    enemy->extraInfo[JumperDirectionIndex] = direction;
+    enemy->extraInfo[JumperVelocityXIndex] = velocity.x;
+    enemy->extraInfo[JumperVelocityYIndex] = velocity.y;
+    enemy->extraInfo[JumperCanJumpIndex] = canJump;
     return false;
 }
 //====================================================
@@ -1260,19 +1294,15 @@ void SpawnBoss()
     cout<<currentEnemiesAlive;
 }
 
-const Animation bossWarning =
-{
-    1000,
-    vector_zero,
-    "!"
-};
 
+const int bossWarningDuration = 1000;
 const int numOfWarnings = 20;
 bool BossTeleport(int &counter, Vector2 *positionToTP, Enemy *e)
 {
     if(counter%10 == 0 && counter<=numOfWarnings)
     {
-        Animation warning = bossWarning;
+        Animation warning = baseAnimation;
+        warning.duration = bossWarningDuration;
         warning.position = *positionToTP;
         AddAnimation(&warning);
 
@@ -1390,7 +1420,7 @@ void DamageEnemy(int enemyIndex, int amount)
 
     if(e->HP <= 0)
     {
-        //DIE
+        RemoveEnemy(enemyIndex);
     }
 }
 
@@ -1533,6 +1563,7 @@ void GameLoop()
         MovePlayer(&player.verticalMomentum, player.position);
 
         EnemiesStep();
+        AnimationCollisionCheck();
 
         if(currentEnemiesAlive == 0)break;
 
