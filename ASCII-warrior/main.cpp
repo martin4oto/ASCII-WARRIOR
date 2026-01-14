@@ -27,7 +27,8 @@ enum EnemyTypes
     Flier,
     Jumper,
 
-    Boss
+    Crusher,
+    Shooter
 };
 
 //extraInfo:
@@ -48,7 +49,7 @@ struct Animation
     int duration;
     Vector2 position;
     char *output;
-    int *collisionFunction(int);
+    void (*collisionFunction)(int);
 };
 
 struct Player
@@ -64,6 +65,8 @@ void PrintHeader();
 void CheckForHits(AttackDirections, Vector2);
 void RemoveEnemy(int);
 void DamageEnemy(int, int);
+bool CollideWithEnemy(int);
+void DamagePlayer(int);
 
 Player player;
 
@@ -72,8 +75,8 @@ clock_t lastFrameTime = 0;
 const int numberOfWaves = 3;
 const int initialWaveNumber = 5;
 
-int enemyTypeCount = 4;
-int bossTypes = 1;
+const int enemyTypeCount = 4;
+const int bossTypeCount = 2;
 const int bossSize = 3;
 
 Enemy* enemiesAlive;
@@ -98,8 +101,6 @@ const int numberOfPlatforms = 9;
 const int minPlatformSize = 5;
 const int maxPlatformSize = 20;
 
-
-
 int attackTimer = 0;
 int timeBetweenAttacks = 900;
 
@@ -113,7 +114,6 @@ int currentTime[10];
 int animationCount = 0;
 
 int attackDuration = 300;
-
 
 const int crawlerInfoSize = 2;
 const int crawlerDirectionXIndex = 0;
@@ -163,7 +163,8 @@ Animation *CreateAnimation(Vector2 position, char* out, int duration)
         false,
         duration,
         position,
-        out
+        out,
+        nullptr
     };
 
     return finished;
@@ -175,7 +176,8 @@ Animation CreateAnimationValue(Vector2 position, char* out, int duration)
         false,
         duration,
         position,
-        out
+        out,
+        nullptr
     };
 }
 
@@ -318,6 +320,10 @@ void GenerateMap()
     putPlatforms();
 }
 
+unsigned char BoardValue(Vector2 *position)
+{
+    return board[position->x][position->y];
+}
 
 bool isEmpty(int x, int y)
 {
@@ -368,9 +374,23 @@ bool canCrawl(Vector2 position)
             isEmpty(position.x, position.y);
 }
 
+unsigned char isObjectEnemy(unsigned char object)
+{
+    return object>=enemyIndexOffset ? object : 0;
+}
+
+unsigned char TranslateObjectToEnemy(unsigned char object)
+{
+    return isObjectEnemy(object)?object-enemyIndexOffset:0;
+}
+
+bool isBoss(int index)
+{
+}
+
 unsigned char isEnemy(Vector2 *position)
 {
-    return board[position->x][position->y]>=enemyIndexOffset ? board[position->x][position->y]:0;
+    return isObjectEnemy(board[position->x][position->y]);
 }
 
 void PrintObject(Vector2 *position)
@@ -432,17 +452,18 @@ void RemoveAnimation(int animationIndex)
     animationCount--;
 }
 
-void NewLine(Vector2 *currentPosition)
+void NewLine(Vector2 *currentPosition, int lineBeginingX)
 {
 
     currentPosition->y++;
-    currentPosition->x--;
+    currentPosition->x = lineBeginingX;
     SetCursorPosition(currentPosition);
 }
 
 void PrintAnimation(Animation *animation)
 {
     Vector2 currentPosition = animation->position;
+    int lineBeginingX = currentPosition.x;
 
     SetCursorPosition(&currentPosition);
 
@@ -452,7 +473,7 @@ void PrintAnimation(Animation *animation)
     {
         if(*animationOutput =='\n')
         {
-            NewLine(&currentPosition);
+            NewLine(&currentPosition,lineBeginingX);
             animationOutput++;
             continue;
         }
@@ -468,12 +489,60 @@ void AddAnimation(Animation *animation)
     ongoingAnimations[animationCount] = *animation;
     currentTime[animationCount] = 0;
 
-    PrintAnimation(&ongoingAnimations[animationCount]);
+    if(!ongoingAnimations[animationCount].collion)
+    {
+        PrintAnimation(&ongoingAnimations[animationCount]);
+    }
 
     animationCount++;
 }
 
+void GenerateAttackPosition(AttackDirections attackDirection, Vector2 *animationPosition,char** animationOutput)
+{
+    switch(attackDirection)
+    {
+        case AttackDirections::up:
+            AddVectorsDirectly(animationPosition, &vector_up);
+            AddVectorsDirectly(animationPosition, &vector_left);
+            *animationOutput = attackUp;
+            break;
+        case AttackDirections::down:
+            AddVectorsDirectly(animationPosition, &vector_down);
+            AddVectorsDirectly(animationPosition, &vector_left);
+            *animationOutput = attackDown;
+            break;
+        case AttackDirections::left:
+            AddVectorsDirectly(animationPosition, &vector_up);
+            AddVectorsDirectly(animationPosition, &vector_left);
+            *animationOutput = attackLeft;
+            break;
+        case AttackDirections::right:
+            AddVectorsDirectly(animationPosition, &vector_up);
+            AddVectorsDirectly(animationPosition, &vector_right);
+            *animationOutput = attackRight;
+            break;
 
+    }
+}
+
+void AttackCollisionFunction(int object)
+{
+    if(isObjectEnemy(object))
+    {
+        DamageEnemy(TranslateObjectToEnemy(object),playerDMG);
+    }
+}
+
+void BuildCollision(Animation *animation, void (*collisionFunction)(int), int duration)
+{
+    Animation newAnimation = *animation;
+    newAnimation.collion = true;
+    newAnimation.collisionFunction = collisionFunction;
+
+    AddAnimation(&newAnimation);
+}
+
+const int attackCollisionDuration = 370;
 void tryAttacking(AttackDirections attack, Player *playerObject)
 {
     if(attackTimer < timeBetweenAttacks)
@@ -488,57 +557,37 @@ void tryAttacking(AttackDirections attack, Player *playerObject)
 
     AddVectorsDirectly(&animationPosition, playerObject->position);
 
-    switch(attack)
-    {
-        case AttackDirections::up:
-            AddVectorsDirectly(&animationPosition, &vector_up);
-            AddVectorsDirectly(&animationPosition, &vector_left);
-            animationOutput = attackUp;
-            break;
-        case AttackDirections::down:
-            AddVectorsDirectly(&animationPosition, &vector_down);
-            AddVectorsDirectly(&animationPosition, &vector_left);
-            animationOutput = attackDown;
-            break;
-        case AttackDirections::left:
-            AddVectorsDirectly(&animationPosition, &vector_up);
-            AddVectorsDirectly(&animationPosition, &vector_left);
-            animationOutput = attackLeft;
-            break;
-        case AttackDirections::right:
-            AddVectorsDirectly(&animationPosition, &vector_up);
-            AddVectorsDirectly(&animationPosition, &vector_right);
-            animationOutput = attackRight;
-            break;
-
-    }
+    GenerateAttackPosition(attack, &animationPosition, &animationOutput);
 
     Animation ann = CreateAnimationValue(animationPosition, animationOutput,attackDuration);
     AddAnimation(&ann);
+
+    BuildCollision(&ann, AttackCollisionFunction, attackCollisionDuration);
 }
 
 void ExecuteAnimationCollision(Animation *animation, int colidedObject)
 {
-    (*animation).collisionFunction(colidedObject);
+    animation->collisionFunction(colidedObject);
 }
 
 void CheckCollision(Animation *currentAnimation)
 {
     Vector2 currentPosition = currentAnimation->position;
     char* animationOutput = currentAnimation->output;
+    int lineBeginingX = currentPosition.x;
 
     while(*animationOutput)
     {
         if(*animationOutput =='\n')
         {
-            NewLine(&currentPosition);
+            NewLine(&currentPosition, lineBeginingX);
             animationOutput++;
             continue;
         }
 
-        if(*animationOutput != air)
+        if(*animationOutput != ' ')
         {
-            ExecuteAnimationCollision(currentAnimation, *animationOutput);
+            ExecuteAnimationCollision(currentAnimation, BoardValue(&currentPosition));
         }
         currentPosition.x++;
         animationOutput++;
@@ -649,9 +698,6 @@ bool MoveEnemy(Vector2 *direction, Vector2* position)
     }
 }
 
-bool CollideWithEnemy(int);
-void DamagePlayer(int);
-
 int MovePlayer(Vector2 *direction, Vector2* playerPosition)
 {
     if(AreEqual(direction, &vector_zero))return 1;
@@ -666,7 +712,7 @@ int MovePlayer(Vector2 *direction, Vector2* playerPosition)
         unsigned char boardValue;
         if(boardValue = isEnemy(playerMove))
         {
-            bool canGo = CollideWithEnemy(boardValue-5);
+            bool canGo = CollideWithEnemy(boardValue-enemyIndexOffset);
             DamagePlayer(1);
             if(!canGo)
             {
@@ -844,8 +890,6 @@ int RoundUp(double number)
 }
 
 
-
-
 void DamagePlayer(int DMG)
 {
     player.HP-=DMG;
@@ -891,16 +935,16 @@ const Enemy JumperBlueprint =
     nullptr
 };
 
-const Enemy BossBlueprint =
+const Enemy BreakerBlueprint =
 {
     'B',
-    EnemyTypes::Boss,
+    EnemyTypes::Crusher,
     10,
     vector_zero,
     nullptr
 };
 
-AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
+void AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
 {
     enemiesAlive[currentEnemiesAlive] = *enemyToAdd;
     int offset = enemySize/2;
@@ -942,7 +986,7 @@ void RemoveEnemy(int EnemyIndex)
 
 bool CollideWithEnemy(int EnemyIndex)
 {
-    if(enemiesAlive[EnemyIndex].type == Boss)
+    if(isBoss(EnemyIndex))
     {
         return false;
     }
@@ -1283,75 +1327,20 @@ bool JumperStep(Enemy *enemy)
     return false;
 }
 //====================================================
-void SpawnBoss()
+
+void SpawnCrusher()
 {
-    Enemy boss = BossBlueprint;
-
-    boss.position = GetRandomEmptyVector(bossSize);
-    boss.extraInfo = new int[3]{0,0,0};
-
-    AddSpecialEnemy(&boss, bossSize);
-    cout<<currentEnemiesAlive;
 }
 
-
-const int bossWarningDuration = 1000;
-const int numOfWarnings = 20;
-bool BossTeleport(int &counter, Vector2 *positionToTP, Enemy *e)
+bool CrusherStep(Enemy *enemy)
 {
-    if(counter%10 == 0 && counter<=numOfWarnings)
-    {
-        Animation warning = baseAnimation;
-        warning.duration = bossWarningDuration;
-        warning.position = *positionToTP;
-        AddAnimation(&warning);
-
-        counter++;
-        return false;
-    }
-    else if(counter>numOfWarnings)
-    {
-        TeleportSpecial(e, positionToTP, bossSize);
-        counter = 0;
-        *positionToTP = vector_zero;
-        return false;
-    }
-
-    counter++;
     return false;
-}
-
-bool BossStep(Enemy *enemy)
-{
-    bool result = false;
-
-    Vector2 chosenPosition =
-    {
-        enemy->extraInfo[0],
-        enemy->extraInfo[1]
-    };
-    int counter = enemy->extraInfo[2];
-
-    if(!AreEqual(&chosenPosition, &vector_zero))
-    {
-        result = BossTeleport(counter, &chosenPosition, enemy);
-    }
-    else
-    {
-        chosenPosition = *player.position;
-        ValidateSpecialPosition(&chosenPosition, bossSize);
-    }
-
-    enemy->extraInfo[0] = chosenPosition.x;
-    enemy->extraInfo[1] = chosenPosition.y;
-    enemy->extraInfo[2] = counter;
-    return result;
 }
 //====================================================
 
 void SpawnEnemy()
 {
-    int randomEnemy = rand()%enemyTypeCount;
+    int randomEnemy = GenerateRandom(0, enemyTypeCount-1);
     EnemyTypes enemyType = (EnemyTypes)randomEnemy;
 
     switch(enemyType)
@@ -1369,6 +1358,11 @@ void SpawnEnemy()
         SpawnJumper();
         break;
     }
+}
+
+void SpawnBoss()
+{
+    SpawnCrusher();
 }
 
 void EnemiesStep()
@@ -1392,8 +1386,8 @@ void EnemiesStep()
         case Jumper:
             hit = JumperStep(enemiesAlive + i);
             break;
-        case Boss:
-            hit = BossStep(enemiesAlive+i);
+        case Crusher:
+            hit = CrusherStep(enemiesAlive+i);
             break;
         }
 
