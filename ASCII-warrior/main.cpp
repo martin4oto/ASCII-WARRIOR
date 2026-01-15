@@ -67,6 +67,7 @@ void RemoveEnemy(int);
 void DamageEnemy(int, int);
 bool CollideWithEnemy(int);
 void DamagePlayer(int);
+void PrintFullBoard();
 
 Player player;
 
@@ -386,6 +387,14 @@ unsigned char TranslateObjectToEnemy(unsigned char object)
 
 bool isBoss(int index)
 {
+    Enemy *enemyToCheck = &enemiesAlive[index];
+
+    int enemyType = enemyToCheck->type;
+    if(enemyType>=enemyTypeCount)
+    {
+        return true;
+    }
+    return false;
 }
 
 unsigned char isEnemy(Vector2 *position)
@@ -797,7 +806,7 @@ void AdjustVectorToSize(Vector2 *v, int Size)
     }
 }
 
-bool IsEmpty_Boss(Vector2 position, int Size)
+bool IsEmpty_Special(Vector2 position, int Size)
 {
     Vector2 current = position;
 
@@ -846,7 +855,7 @@ void ValidateSpecialPosition(Vector2 *position, int Size)
     }
 }
 
-void TeleportSpecial(Enemy *e, Vector2 *newPosition, int Size)
+void MoveSpecial(Enemy *e, Vector2 *newPosition, int Size)
 {
     ValidateSpecialPosition(newPosition, Size);
 
@@ -935,7 +944,7 @@ const Enemy JumperBlueprint =
     nullptr
 };
 
-const Enemy BreakerBlueprint =
+const Enemy CrusherBlueprint =
 {
     'B',
     EnemyTypes::Crusher,
@@ -944,19 +953,29 @@ const Enemy BreakerBlueprint =
     nullptr
 };
 
-void AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
+void PutSpecialEnemyOnBoard(Enemy* enemyToAdd, int enemySize,int index)
 {
-    enemiesAlive[currentEnemiesAlive] = *enemyToAdd;
     int offset = enemySize/2;
 
     for(int i = 0; i<enemySize; i++)
     {
         for(int j = 0; j<enemySize; j++)
         {
-            board[enemyToAdd->position.x + i - offset][enemyToAdd->position.y + j - offset] = currentEnemiesAlive+5;
+            board[enemyToAdd->position.x + i - offset][enemyToAdd->position.y + j - offset] = index;
         }
     }
+}
 
+void DrawSpecialEnemy(Enemy* enemyToAdd, int enemySize,int index)
+{
+    PutSpecialEnemyOnBoard(enemyToAdd,enemySize,index);
+    PrintFullBoard();
+}
+
+void AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
+{
+    enemiesAlive[currentEnemiesAlive] = *enemyToAdd;
+    DrawSpecialEnemy(enemyToAdd, enemySize,currentEnemiesAlive+enemyIndexOffset);
     currentEnemiesAlive++;
 }
 
@@ -1027,7 +1046,7 @@ Vector2 GetRandomEmptyVector(int Size)
             GenerateRandom(1, height-2)
         };
     }
-    while(!IsEmpty_Boss(v, Size));
+    while(!IsEmpty_Special(v, Size));
     return v;
 }
 
@@ -1330,10 +1349,184 @@ bool JumperStep(Enemy *enemy)
 
 void SpawnCrusher()
 {
+    Enemy boss = CrusherBlueprint;
+
+    boss.position = GetRandomEmptyVector(bossSize);
+    boss.extraInfo = new int[6]{0,-1,0,0,0,currentEnemiesAlive};
+
+    AddSpecialEnemy(&boss, bossSize);
+    cout<<currentEnemiesAlive;
+}
+
+//crusher extra info:
+/*
+{
+isOngoing,
+behaviour,
+timer,
+chosenPositionX,
+chosenPositionY
+}
+*/
+
+
+enum CrusherBehaviour
+{
+    SquareMovePhase = 0,
+    SquareExpandPhase = 1,
+    SquareShrinkPhase = 2,
+    LineMovePhase,
+    LinePhase
+};
+const int crusherBehaviourCount = 3;
+
+const int crusherSize = 3;
+const int crusherExpandedSize = 7;
+
+const int crusherOngoingIndex = 0;
+const int crusherBehaviourIndex = 1;
+const int crusherTimerIndex = 2;
+const int crusherChosenPositionXIndex = 3;
+const int crusherChosenPositionYIndex = 4;
+const int crusherBoardIndex = 5;
+//at least 2 sec
+const int moveTimerCrusher = 14;
+const int expandTimerCrusher = 24;
+const int shrinkTimerCrusher = 24;
+
+void CrusherChooseNewSquareMovePosition(Enemy *boss)
+{
+    Vector2 position = *player.position;
+
+    ValidateSpecialPosition(&position,crusherExpandedSize);
+
+    boss->extraInfo[crusherChosenPositionXIndex] = position.x;
+    boss->extraInfo[crusherChosenPositionYIndex] = position.y;
+}
+
+void CrusherChooseNewBehaviour(Enemy *boss)
+{
+    boss->extraInfo[crusherOngoingIndex] = true;
+    int behaviour = boss->extraInfo[crusherBehaviourIndex];
+    //cout<<behaviour;
+    behaviour++;
+    behaviour=behaviour%crusherBehaviourCount;
+
+    switch(behaviour)
+    {
+    case SquareMovePhase:
+        CrusherChooseNewSquareMovePosition(boss);
+        break;
+    }
+    boss->extraInfo[crusherBehaviourIndex] = behaviour;
+}
+
+bool MoveCrusher(Enemy *boss)
+{
+    Vector2 desiredPosition=
+    {
+        boss->extraInfo[crusherChosenPositionXIndex],
+        boss->extraInfo[crusherChosenPositionYIndex]
+    };
+
+    MoveSpecial(boss, &desiredPosition, crusherSize);
+}
+
+bool SquareMovePhaseCrusher(Enemy *boss)
+{
+    int timer = boss->extraInfo[crusherTimerIndex];
+    if(timer>=moveTimerCrusher)
+    {
+        MoveCrusher(boss);
+        boss->extraInfo[crusherOngoingIndex] = false;
+         boss->extraInfo[crusherTimerIndex]=0;
+        return false;
+    }
+    else
+    {
+        boss->extraInfo[crusherTimerIndex]++;
+        return false;
+    }
+}
+
+
+void ExpandSpecial(Enemy *enemy, int wantedSize, int index)
+{
+    DrawSpecialEnemy(enemy, wantedSize,index);
+}
+
+bool ExpandCrusher(Enemy *boss)
+{
+    int index = boss->extraInfo[crusherBoardIndex] + enemyIndexOffset;
+    ExpandSpecial(boss, crusherExpandedSize, index);
+}
+
+void ShrinkCrusher(Enemy *boss)
+{
+    int index = boss->extraInfo[crusherBoardIndex] + enemyIndexOffset;
+    PutSpecialEnemyOnBoard(boss, crusherExpandedSize, air);
+    ExpandSpecial(boss, crusherSize, index);
+}
+
+bool SquareExpandPhaseCrusher(Enemy *boss)
+{
+    int timer = boss->extraInfo[crusherTimerIndex];
+
+    if(timer >= expandTimerCrusher)
+    {
+        ExpandCrusher(boss);
+        boss->extraInfo[crusherOngoingIndex] = false;
+        boss->extraInfo[crusherTimerIndex]=0;
+        return false;
+    }
+    else
+    {
+        boss->extraInfo[crusherTimerIndex]++;
+        return false;
+    }
+}
+
+bool SquareShrinkPhaseCrusher(Enemy *boss)
+{
+    int timer = boss->extraInfo[crusherTimerIndex];
+
+    if(timer >= shrinkTimerCrusher)
+    {
+        ShrinkCrusher(boss);
+        boss->extraInfo[crusherOngoingIndex] = false;
+        boss->extraInfo[crusherTimerIndex] = 0;
+        return false;
+    }
+    else
+    {
+        boss->extraInfo[crusherTimerIndex]++;
+        return false;
+    }
 }
 
 bool CrusherStep(Enemy *enemy)
 {
+    bool isOngoing = enemy->extraInfo[crusherOngoingIndex];
+
+    if(isOngoing)
+    {
+        int behaviour = enemy->extraInfo[crusherBehaviourIndex];
+
+        switch(behaviour)
+        {
+        case SquareMovePhase:
+            return SquareMovePhaseCrusher(enemy);
+        case SquareExpandPhase:
+            return SquareExpandPhaseCrusher(enemy);
+        case SquareShrinkPhase:
+            return SquareShrinkPhaseCrusher(enemy);
+            break;
+        }
+    }
+    else
+    {
+        CrusherChooseNewBehaviour(enemy);
+    }
     return false;
 }
 //====================================================
@@ -1574,6 +1767,7 @@ void GameLoop()
 
 int main()
 {
+    srand((unsigned int)time(NULL));
     system("MODE CON COLS=101 LINES=40");
     GameSetup();
 
@@ -1581,7 +1775,7 @@ int main()
 
     for(int i = 0; i<numberOfWaves; i++)
     {
-        SpawnWave(initialWaveNumber);
+        SpawnBoss();
 
         GameLoop();
 
