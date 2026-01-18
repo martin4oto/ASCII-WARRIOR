@@ -1,3 +1,26 @@
+/**
+Solution to course project #10
+Introduction to programming course
+Faculty of Mathematics and Informatics of Sofia University
+Winter semester 2025/2026
+*
+@author Martin Aleksov
+@idnumber 1MI0600673
+@compiler GCC
+*
+2D platform game
+the player can move around using a/d/w
+the player can perform attacks in every direction using j/k/l/i
+there are different types of enemies each with different ai
+Walker
+Crawler
+Flier
+Jumper
+and 1 boss
+Shooter
+*
+*/
+
 #include <iostream>
 #include <ctime>
 #include <conio.h>
@@ -64,6 +87,11 @@ struct Enemy
     int* extraInfo;
 };
 
+struct EnemyList
+{
+    Enemy* enemiesAlive = nullptr;
+    int currentEnemiesAlive = 0;
+};
 
 struct Animation
 {
@@ -71,7 +99,7 @@ struct Animation
     Color color;
     int duration;
     char* output;
-    void (*collisionFunction)(int);
+    void (*collisionFunction)(int, EnemyList*);
     Vector2 position;
 };
 
@@ -81,14 +109,23 @@ struct Player
     int HP;
     Vector2* position;
     Vector2 verticalMomentum;
+    int attackTimer;
+};
+
+const int maxAnimations = 10;
+struct AnimationList
+{
+    Animation ongoingAnimations[maxAnimations];
+    int currentTime[maxAnimations];
+    int animationCount = 0;
 };
 //========================================================
 
 void PrintHeader();
 void CheckForHits(AttackDirections, Vector2);
 void RemoveEnemy(int);
-void DamageEnemy(int, int);
-bool CollideWithEnemy(int);
+void DamageEnemy(int, int, EnemyList*);
+bool CollideWithEnemy(int, EnemyList*);
 void DamagePlayer(int);
 void PrintFullBoard();
 void AddDiagonalShootingAnimation(Enemy*, char);
@@ -107,18 +144,36 @@ const int initialWaveNumber = 5;
 const int enemyTypeCount = 4;
 const int bossTypeCount = 2;
 
-Enemy* enemiesAlive = nullptr;
 
 const char air = 0;
 const char barrier = 1;
 const char platform = 2;
 const char player_index = 3;
 
-Vector2 vector_down;
-Vector2 vector_up;
-Vector2 vector_left;
-Vector2 vector_right;
-Vector2 vector_zero;
+const Vector2 vector_down =
+{
+    0,
+    1
+};
+const Vector2 vector_up =
+{
+    0,
+    -1
+};
+const Vector2 vector_left =
+{
+    -1,
+    0
+};
+const Vector2 vector_right =
+{
+    1,
+    0
+};
+const Vector2 vector_zero =
+{
+    0,0
+};
 
 unsigned char** board = nullptr;
 
@@ -129,8 +184,7 @@ const int numberOfPlatforms = 9;
 const int minPlatformSize = 5;
 const int maxPlatformSize = 20;
 
-int attackTimer = 0;
-int timeBetweenAttacks = 900;
+const int timeBetweenAttacks = 900;
 
 const char* attackUp = "/-\\";
 const char* attackDown = "\\_/";
@@ -138,11 +192,7 @@ const char* attackLeft = "/\n|\n\\";
 const char* attackRight = "\\\n|\n/";
 const int attackCollisionDuration = 370;
 
-Animation ongoingAnimations[10];
-int currentTime[10];
-int animationCount = 0;
-
-int attackDuration = 300;
+const int attackDuration = 300;
 
 const int crawlerInfoSize = 2;
 const int crawlerDirectionXIndex = 0;
@@ -169,7 +219,7 @@ const int JumperVelocityXIndex = 1;
 const int JumperVelocityYIndex = 2;
 const int JumperCanJumpIndex = 3;
 
-int enemyIndexOffset = 5;
+const int enemyIndexOffset = 5;
 
 const int playerDMG = 1;
 
@@ -188,7 +238,6 @@ const Animation baseAnimation =
 short* shootingStringSizes = nullptr;
 
 const int maxEnemiesAllowed = 64;
-int currentEnemiesAlive = 0;
 
 bool lost = false;
 
@@ -204,7 +253,8 @@ Animation* CreateAnimation(Color color,Vector2 position, char* out, int duration
 {
     // allocate new animation
     Animation* finished = new Animation;
-    if (!finished) return nullptr;
+    if (!finished)
+        return nullptr;
 
     *finished = {
         false,
@@ -240,7 +290,7 @@ Animation CreateAnimationValue(Color color, Vector2 position, char* out, int dur
  Compare two Vector2 pointers.
  Returns false if either pointer is null.
  */
-bool AreEqual(Vector2* v1, Vector2* v2)
+bool AreEqual(const Vector2* v1, const Vector2* v2)
 {
     if (!v1 || !v2) return false;
     // if two vectors are equal
@@ -252,12 +302,14 @@ bool AreEqual(Vector2* v1, Vector2* v2)
   Return a new Vector2 allocated on the heap which is v1 + v2.
   If either pointer is null returns nullptr.
 */
-Vector2* AddVectors(Vector2* v1, Vector2* v2)
+Vector2* AddVectors(const Vector2* v1, const Vector2* v2)
 {
-    if (!v1 || !v2) return nullptr;
+    if (!v1 || !v2)
+        return nullptr;
 
     Vector2* result = new Vector2;
-    if (!result) return nullptr;
+    if (!result)
+        return nullptr;
 
     result->x = v1->x + v2->x;
     result->y = v1->y + v2->y;
@@ -270,7 +322,7 @@ Vector2* AddVectors(Vector2* v1, Vector2* v2)
   In-place addition: v1 += v2.
   If either pointer is null the function returns immediately.
 */
-void AddVectorsDirectly(Vector2* v1, Vector2* v2)
+void AddVectorsDirectly(Vector2* v1,const Vector2* v2)
 {
     if (!v1 || !v2) return;
     v1->x += v2->x;
@@ -293,7 +345,7 @@ void ZeroVector(Vector2* v)
   Manhattan distance between two points.
   If either pointer is null returns INT_MAX.
  */
-int RoughDistance(Vector2* v1, Vector2* v2)
+int RoughDistance(const Vector2* v1, const Vector2* v2)
 {
     if (!v1 || !v2) return INT_MAX;
     return Abs(v1->x - v2->x) + Abs(v1->y - v2->y);
@@ -317,8 +369,11 @@ Color platformColor = COLOR_WHITE;
   Map board values to console characters and print.
   objectToPrint is a board tile value, not a pointer.
  */
-void PrintObject(char objectToPrint)
+void PrintObject(char objectToPrint, EnemyList *enemyList)
 {
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     switch (objectToPrint)
     {
     case air:
@@ -566,8 +621,11 @@ unsigned char TranslateObjectToEnemy(unsigned char object)
     return isObjectEnemy(object) ? object - enemyIndexOffset : 0;
 }
 
-bool isBoss(unsigned char index)
+bool isBoss(unsigned char index, EnemyList *enemyl)
 {
+    Enemy *enemiesAlive = enemyl->enemiesAlive;
+    int &currentEnemiesAlive = enemyl->currentEnemiesAlive;
+
     if (!enemiesAlive) return false;
     if (index < 0) return false;
     // bounds check: index must be < currentEnemiesAlive
@@ -593,10 +651,10 @@ unsigned char isEnemy(Vector2* position)
   PrintObject (overload)
   Print tile at position; returns if position invalid.
  */
-void PrintObject(Vector2* position)
+void PrintObject(Vector2* position, EnemyList* enemyList)
 {
     if (!ValidateVectorForBoard(position)) return;
-    PrintObject(board[position->x][position->y]);
+    PrintObject(board[position->x][position->y],enemyList);
 }
 
 void RemoveObject(Vector2* position)
@@ -618,7 +676,7 @@ void DecreaseValueByOne(Vector2* position)
     board[position->x][position->y]--;
 }
 
-void VisualizePlayer()
+void VisualizePlayer(EnemyList *enemyList)
 {
     if (!player.position || !ValidateVectorForBoard(player.position)) return;
 
@@ -628,7 +686,7 @@ void VisualizePlayer()
 
     SetCursorPosition(position);
 
-    PrintObject(position);
+    PrintObject(position, enemyList);
 }
 
 int minimum(int a, int b)
@@ -658,9 +716,13 @@ void NewLine(Vector2* currentPosition, int lineBeginingX)
   Remove animation at index animationIndex.
   Validates index and animation output pointers.
 */
-void RemoveAnimation(int animationIndex)
+void RemoveAnimation(int animationIndex, AnimationList *animationList, EnemyList *enemyList)
 {
-    if (animationIndex < 0 || animationIndex >= animationCount) return;
+    if (animationIndex < 0 || animationIndex >= maxAnimations) return;
+
+    Animation* ongoingAnimations = animationList->ongoingAnimations;
+    int &animationCount = animationList->animationCount;
+    int *currentTime = animationList->currentTime;
 
     Animation* animationToRemove = &ongoingAnimations[animationIndex];
 
@@ -671,17 +733,6 @@ void RemoveAnimation(int animationIndex)
     SetCursorPosition(&currentPosition);
 
     const char* animationOutput = animationToRemove->output;
-    if (!animationOutput)
-    {
-        // still need to shift array entries
-        for (int i = animationIndex + 1; i < animationCount; i++)
-        {
-            ongoingAnimations[i - 1] = ongoingAnimations[i];
-            currentTime[i - 1] = currentTime[i];
-        }
-        animationCount--;
-        return;
-    }
 
     while (*animationOutput)
     {
@@ -692,7 +743,7 @@ void RemoveAnimation(int animationIndex)
             continue;
         }
 
-        PrintObject(&currentPosition);
+        PrintObject(&currentPosition, enemyList);
         // adding to the position
         currentPosition.x++;
         animationOutput++;
@@ -712,7 +763,7 @@ void RemoveAnimation(int animationIndex)
   PrintAnimation
   Render animation to console. No-op if animation null or output null.
 */
-void PrintAnimation(Animation* animation)
+void PrintAnimation(Animation* animation, EnemyList *enemyList)
 {
     if (animation == nullptr) return;
     if (!animation->output) return;
@@ -742,7 +793,7 @@ void PrintAnimation(Animation* animation)
         else
         {
             // skip if the animation at this position is empty
-            PrintObject(&currentPosition);
+            PrintObject(&currentPosition, enemyList);
         }
         currentPosition.x++;
         animationOutput++;
@@ -753,17 +804,22 @@ void PrintAnimation(Animation* animation)
   AddAnimation
   Add animation to ongoingAnimations list. Requires valid pointer.
 */
-void AddAnimation(Animation* animation)
+void AddAnimation(Animation* animation, AnimationList *animationList, EnemyList *enemyList)
 {
+    Animation* ongoingAnimations = animationList->ongoingAnimations;
+    int &animationCount = animationList->animationCount;
+    int *currentTime = animationList->currentTime;
+
     if (!animation) return;
-    if (animationCount < 0 || animationCount >= (int)(sizeof(ongoingAnimations) / sizeof(ongoingAnimations[0]))) return;
+    if (animationCount < 0 || animationCount >= maxAnimations) return;
+
 
     ongoingAnimations[animationCount] = *animation;
     currentTime[animationCount] = 0;
 
     if (!ongoingAnimations[animationCount].collion)
     {
-        PrintAnimation(&ongoingAnimations[animationCount]);
+        PrintAnimation(&ongoingAnimations[animationCount], enemyList);
     }
     animationCount++;
 }
@@ -808,11 +864,11 @@ void GenerateAttackPosition(AttackDirections attackDirection, Vector2* animation
 }
 
 // collision for attack animations
-void AttackCollisionFunction(int object)
+void AttackCollisionFunction(int object, EnemyList *enemyList)
 {
     if (isObjectEnemy(object))
     {
-        DamageEnemy(TranslateObjectToEnemy(object), playerDMG);
+        DamageEnemy(TranslateObjectToEnemy(object), playerDMG, enemyList);
     }
 }
 
@@ -820,7 +876,7 @@ void AttackCollisionFunction(int object)
   BuildCollision
   Create a collision-enabled copy of animation. Validates inputs.
 */
-void BuildCollision(Animation* animation, void (*collisionFunction)(int), int duration)
+void BuildCollision(Animation* animation, void (*collisionFunction)(int,EnemyList*), int duration, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!animation || !collisionFunction) return;
 
@@ -829,7 +885,7 @@ void BuildCollision(Animation* animation, void (*collisionFunction)(int), int du
     newAnimation.collisionFunction = collisionFunction;
     newAnimation.duration = duration;
 
-    AddAnimation(&newAnimation);
+    AddAnimation(&newAnimation, animationList, enemyList);
 }
 
 const Color attackColor = COLOR_WHITE;
@@ -838,15 +894,15 @@ const Color attackColor = COLOR_WHITE;
   tryAttacking
   Player attack entry point. Validates playerObject pointer.
 */
-void tryAttacking(AttackDirections attack, Player* playerObject)
+void tryAttacking(AttackDirections attack, Player* playerObject, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!playerObject || !playerObject->position) return;
 
-    if (attackTimer < timeBetweenAttacks)
+    if (player.attackTimer < timeBetweenAttacks)
     {
         return;
     }
-    attackTimer = 0;
+    player.attackTimer = 0;
 
     const char* animationOutput = nullptr;
     Vector2 animationPosition = *playerObject->position;
@@ -854,27 +910,27 @@ void tryAttacking(AttackDirections attack, Player* playerObject)
     GenerateAttackPosition(attack, &animationPosition, &animationOutput);
 
     Animation ann = CreateAnimationValue(attackColor,animationPosition, (char*)animationOutput, attackDuration);
-    AddAnimation(&ann);
+    AddAnimation(&ann, animationList, enemyList);
 
     // make the attacks collide
-    BuildCollision(&ann, AttackCollisionFunction, attackCollisionDuration);
+    BuildCollision(&ann, AttackCollisionFunction, attackCollisionDuration, animationList, enemyList);
 }
 
 /*
   ExecuteAnimationCollision
   Call collision function for animation. Validates parameters.
 */
-void ExecuteAnimationCollision(Animation* animation, int colidedObject)
+void ExecuteAnimationCollision(Animation* animation, int colidedObject, EnemyList *enemyList)
 {
     if (!animation || !animation->collisionFunction) return;
-    animation->collisionFunction(colidedObject);
+    animation->collisionFunction(colidedObject, enemyList);
 }
 
 /*
   CheckCollision
   Walk animation output and invoke collision function where appropriate.
 */
-void CheckCollision(Animation* currentAnimation)
+void CheckCollision(Animation* currentAnimation, EnemyList *enemyList)
 {
     if (!currentAnimation) return;
     if (!currentAnimation->output) return;
@@ -896,7 +952,7 @@ void CheckCollision(Animation* currentAnimation)
         if (*animationOutput != ' ')
         {
             // start collision function
-            ExecuteAnimationCollision(currentAnimation, BoardValue(&currentPosition));
+            ExecuteAnimationCollision(currentAnimation, BoardValue(&currentPosition), enemyList);
         }
         currentPosition.x++;
         animationOutput++;
@@ -907,8 +963,12 @@ void CheckCollision(Animation* currentAnimation)
   AnimationCollisionCheck
   Check collisions for all collision-enabled animations.
 */
-void AnimationCollisionCheck()
+void AnimationCollisionCheck(AnimationList *animationList, EnemyList *enemyList)
 {
+    Animation* ongoingAnimations = animationList->ongoingAnimations;
+    int &animationCount = animationList->animationCount;
+    int *currentTime = animationList->currentTime;
+
     for (int i = 0; i < animationCount; i++)
     {
         Animation* currentAnimation = ongoingAnimations + i;
@@ -916,7 +976,7 @@ void AnimationCollisionCheck()
         if (currentAnimation->collion)
         {
             // start collision check
-            CheckCollision(currentAnimation);
+            CheckCollision(currentAnimation, enemyList);
         }
     }
 }
@@ -925,9 +985,13 @@ void AnimationCollisionCheck()
   AnimatinStep
   Increment timers and remove expired animations safely.
 */
-void AnimatinStep(int delta)
+void AnimatinStep(int delta, AnimationList *animationList, EnemyList *enemyList)
 {
-    attackTimer += delta;
+    Animation* ongoingAnimations = animationList->ongoingAnimations;
+    int &animationCount = animationList->animationCount;
+    int *currentTime = animationList->currentTime;
+
+    player.attackTimer += delta;
     for (int i = 0; i < animationCount; i++)
     {
         currentTime[i] += delta;
@@ -935,7 +999,7 @@ void AnimatinStep(int delta)
 
         if (currentTime[i] > currentAnimation->duration)
         {
-            RemoveAnimation(i);
+            RemoveAnimation(i, animationList, enemyList);
             i--; // account for shifting array after removal
         }
     }
@@ -985,7 +1049,7 @@ int CheckForVerticalSpace(Vector2* startingPosition, int iterations)
   Move a board object from one tile to another and update the console.
   Validates moveFrom and moveTo.
 */
-void MoveObject(Vector2* moveFrom, Vector2* moveTo)
+void MoveObject(Vector2* moveFrom, Vector2* moveTo, EnemyList *enemyList)
 {
     if (!moveFrom || !moveTo) return;
     if (!ValidateVectorForBoard(moveFrom) || !ValidateVectorForBoard(moveTo)) return;
@@ -994,10 +1058,10 @@ void MoveObject(Vector2* moveFrom, Vector2* moveTo)
     unsigned int objectToMove = board[moveFrom->x][moveFrom->y];
 
     SetCursorPosition(moveFrom);
-    PrintObject(air);
+    PrintObject(air, enemyList);
 
     SetCursorPosition(moveTo);
-    PrintObject(objectToMove);
+    PrintObject(objectToMove, enemyList);
 
     board[moveFrom->x][moveFrom->y] = air;
     board[moveTo->x][moveTo->y] = (unsigned char)objectToMove;
@@ -1008,7 +1072,7 @@ void MoveObject(Vector2* moveFrom, Vector2* moveTo)
  * Move an enemy position by direction vector; validates pointers.
  * Returns true if moved, false otherwise.
  */
-bool MoveEnemy(Vector2* direction, Vector2* position)
+bool MoveEnemy(Vector2* direction, Vector2* position, EnemyList *enemyList)
 {
     if (!direction || !position) return false;
     if (AreEqual(direction, &vector_zero)) return true;
@@ -1020,7 +1084,7 @@ bool MoveEnemy(Vector2* direction, Vector2* position)
     bool canMove = isEmpty(enemyMove->x, enemyMove->y);
     if (canMove)
     {
-        MoveObject(position, enemyMove);
+        MoveObject(position, enemyMove, enemyList);
         *position = *enemyMove;
         delete enemyMove;
         return true;
@@ -1035,7 +1099,7 @@ bool MoveEnemy(Vector2* direction, Vector2* position)
  * Move the player by direction if possible. Validates parameters.
  * Returns 0 on success, 1 on failure.
  */
-int MovePlayer(Vector2* direction, Vector2* playerPosition)
+int MovePlayer(const Vector2* direction, Vector2* playerPosition, EnemyList *enemyList)
 {
     if (!direction || !playerPosition) return 1;
     if (AreEqual(direction, &vector_zero)) return 1;
@@ -1048,7 +1112,7 @@ int MovePlayer(Vector2* direction, Vector2* playerPosition)
         unsigned char boardValue = isEnemy(playerMove);
         if (boardValue)
         {
-            bool canGo = CollideWithEnemy(boardValue - enemyIndexOffset);
+            bool canGo = CollideWithEnemy(boardValue - enemyIndexOffset, enemyList);
             DamagePlayer(1);
             if (!canGo)
             {
@@ -1057,7 +1121,7 @@ int MovePlayer(Vector2* direction, Vector2* playerPosition)
             }
         }
 
-        MoveObject(playerPosition, playerMove);
+        MoveObject(playerPosition, playerMove, enemyList);
 
         *playerPosition = *playerMove;
         delete playerMove;
@@ -1074,7 +1138,7 @@ int MovePlayer(Vector2* direction, Vector2* playerPosition)
  * GravityStep
  * Apply gravity/momentum to an object. Validates pointers.
  */
-void GravityStep(Vector2* gravityPull, Vector2* momentum, Vector2* position, int& jumpsLeft)
+void GravityStep(const Vector2* gravityPull, Vector2* momentum, Vector2* position, int& jumpsLeft)
 {
     if (!gravityPull || !momentum || !position) return;
 
@@ -1190,7 +1254,7 @@ void ValidateSpecialPosition(Vector2* position, int Size)
  * MoveSpecial
  * Move a larger-than-one tile enemy (square). Validates inputs.
  */
-void MoveSpecial(Enemy* e, Vector2* newPosition, int Size)
+void MoveSpecial(Enemy* e, Vector2* newPosition, int Size, EnemyList *enemyList)
 {
     if (!e || !newPosition) return;
 
@@ -1211,7 +1275,7 @@ void MoveSpecial(Enemy* e, Vector2* newPosition, int Size)
     {
         for (int j = 0; j < Size; j++)
         {
-            MoveObject(&moveFrom, &moveTo);
+            MoveObject(&moveFrom, &moveTo, enemyList);
 
             moveFrom.x += xDirection;
             moveTo.x += xDirection;
@@ -1336,8 +1400,11 @@ void DrawSpecialEnemy(Enemy* enemyToAdd, int enemySize, int index)
     //PrintFullBoard();
 }
 
-void AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
+void AddSpecialEnemy(Enemy* enemyToAdd, int enemySize, EnemyList *enemyList)
 {
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     if (!enemiesAlive || currentEnemiesAlive >= maxEnemiesAllowed) return;
     if (!enemyToAdd) return;
 
@@ -1346,8 +1413,11 @@ void AddSpecialEnemy(Enemy* enemyToAdd, int enemySize)
     currentEnemiesAlive++;
 }
 
-void AddEnemy(Enemy* enemyToAdd)
+void AddEnemy(Enemy* enemyToAdd, EnemyList *enemyList)
 {
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     if (!enemiesAlive || currentEnemiesAlive >= maxEnemiesAllowed || !enemyToAdd) return;
 
     enemiesAlive[currentEnemiesAlive] = *enemyToAdd;
@@ -1417,10 +1487,15 @@ void RemoveEnemyFromBoard(Enemy* enemy)
  * RemoveEnemy
  * Remove enemy at a given index. Validates index and enemiesAlive.
  */
-void RemoveEnemy(int enemyIndex)
+void RemoveEnemy(int enemyIndex, EnemyList *enemyList)
 {
-    if (!enemiesAlive) return;
-    if (enemyIndex < 0 || enemyIndex >= currentEnemiesAlive) return;
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
+    if (!enemiesAlive)
+        return;
+    if (enemyIndex < 0 || enemyIndex >= currentEnemiesAlive)
+        return;
 
     Enemy* enemyToRemove = enemiesAlive + enemyIndex;
 
@@ -1441,16 +1516,19 @@ void RemoveEnemy(int enemyIndex)
     currentEnemiesAlive--;
 }
 
-bool CollideWithEnemy(int EnemyIndex)
+bool CollideWithEnemy(int EnemyIndex, EnemyList *enemyList)
 {
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     if (EnemyIndex < 0 || EnemyIndex >= currentEnemiesAlive) return false;
 
-    if (isBoss(EnemyIndex))
+    if (isBoss(EnemyIndex, enemyList))
     {
         return false;
     }
 
-    RemoveEnemy(EnemyIndex);
+    RemoveEnemy(EnemyIndex, enemyList);
     return true;
 }
 
@@ -1495,7 +1573,7 @@ Vector2 GetRandomEmptyVector(int Size)
 const int walkerInfoSize = 1;
 const int walkerDeffaultDirection = 1;
 
-void SpawnWalker()
+void SpawnWalker(EnemyList *enemyList)
 {
     Vector2 initialPosition = GetRandomEmptyVector();
 
@@ -1503,11 +1581,11 @@ void SpawnWalker()
 
     Enemy walker = WalkerBlueprint;
     walker.position = initialPosition;
-    walker.extraInfo = new int[1] { walkerDeffaultDirection }; // was: new int(walkerDeffaultDirection)
-    AddEnemy(&walker);
+    walker.extraInfo = new int[1] { walkerDeffaultDirection };
+    AddEnemy(&walker, enemyList);
 }
 
-bool WalkerStep(Enemy* enemy)
+bool WalkerStep(Enemy* enemy, EnemyList *enemyList)
 {
     if (!enemy) return false;
     Vector2* position = &enemy->position;
@@ -1524,7 +1602,7 @@ bool WalkerStep(Enemy* enemy)
 
     if (canStand(desiredPosition))
     {
-        MoveObject(position, &desiredPosition);
+        MoveObject(position, &desiredPosition, enemyList);
         *position = desiredPosition;
 
         return false;
@@ -1536,7 +1614,7 @@ bool WalkerStep(Enemy* enemy)
 }
 //=========================================
 
-void SpawnCrawler()
+void SpawnCrawler(EnemyList *enemyList)
 {
     Vector2 initialPosition = GetRandomEmptyVector();
 
@@ -1545,7 +1623,7 @@ void SpawnCrawler()
     Enemy crawler = CrawlerBlueprint;
     crawler.position = initialPosition;
     crawler.extraInfo = new int[crawlerInfoSize] {crawlerDirectionXDefault, crawlerDirectionYDefault};
-    AddEnemy(&crawler);
+    AddEnemy(&crawler, enemyList);
 }
 
 void CrawlerGetNewDirection(Enemy* enemy)
@@ -1563,8 +1641,7 @@ void CrawlerGetNewDirection(Enemy* enemy)
     {
         Vector2 testPosition = position;
         AddVectorsDirectly(&testPosition, &vector_up);
-        if (canCrawl(testPosition))
-        {
+        if (canCrawl(testPosition)){
             enemy->extraInfo[crawlerDirectionXIndex] = vector_up.x;
             enemy->extraInfo[crawlerDirectionYIndex] = vector_up.y;
             return;
@@ -1572,8 +1649,7 @@ void CrawlerGetNewDirection(Enemy* enemy)
 
         testPosition = position;
         AddVectorsDirectly(&testPosition, &vector_down);
-        if (canCrawl(testPosition))
-        {
+        if (canCrawl(testPosition)){
             enemy->extraInfo[crawlerDirectionXIndex] = vector_down.x;
             enemy->extraInfo[crawlerDirectionYIndex] = vector_down.y;
             return;
@@ -1583,8 +1659,7 @@ void CrawlerGetNewDirection(Enemy* enemy)
     {
         Vector2 testPosition = position;
         AddVectorsDirectly(&testPosition, &vector_left);
-        if (canStandorHang(testPosition))
-        {
+        if (canStandorHang(testPosition)) {
             enemy->extraInfo[crawlerDirectionXIndex] = vector_left.x;
             enemy->extraInfo[crawlerDirectionYIndex] = vector_left.y;
             return;
@@ -1592,8 +1667,7 @@ void CrawlerGetNewDirection(Enemy* enemy)
 
         testPosition = position;
         AddVectorsDirectly(&testPosition, &vector_right);
-        if (canStandorHang(testPosition))
-        {
+        if (canStandorHang(testPosition)){
             enemy->extraInfo[crawlerDirectionXIndex] = vector_right.x;
             enemy->extraInfo[crawlerDirectionYIndex] = vector_right.y;
             return;
@@ -1604,7 +1678,7 @@ void CrawlerGetNewDirection(Enemy* enemy)
     enemy->extraInfo[crawlerDirectionYIndex] *= -1;
 }
 
-bool CrawerStep(Enemy* enemy)
+bool CrawerStep(Enemy* enemy, EnemyList *enemyList)
 {
     if (!enemy || !enemy->extraInfo) return false;
 
@@ -1629,7 +1703,7 @@ bool CrawerStep(Enemy* enemy)
     {
         if (canStandorHang(desiredPosition))
         {
-            MoveObject(position, &desiredPosition);
+            MoveObject(position, &desiredPosition, enemyList);
             *position = desiredPosition;
 
             return false;
@@ -1639,7 +1713,7 @@ bool CrawerStep(Enemy* enemy)
     {
         if (canCrawl(desiredPosition))
         {
-            MoveObject(position, &desiredPosition);
+            MoveObject(position, &desiredPosition, enemyList);
             *position = desiredPosition;
 
             return false;
@@ -1651,7 +1725,7 @@ bool CrawerStep(Enemy* enemy)
 }
 //=================================================
 
-void SpawnFlier()
+void SpawnFlier(EnemyList *enemyList)
 {
     Vector2 initialPosition = GetRandomEmptyVector();
 
@@ -1659,12 +1733,12 @@ void SpawnFlier()
     flier.position = initialPosition;
     // Ensure the flier has a non-zero horizontal direction so it can move.
     flier.extraInfo = new int[flierInfoSize] { 1 }; // set default direction to 1
-    AddEnemy(&flier);
+    AddEnemy(&flier, enemyList);
 }
 
 const int flyPercentage = 10;
 
-bool Fly(Vector2* position)
+bool Fly(Vector2* position, EnemyList* enemyList)
 {
     if (!position) return false;
 
@@ -1689,7 +1763,7 @@ bool Fly(Vector2* position)
 
         if (isEmpty(desiredPosition.x, desiredPosition.y))
         {
-            MoveObject(position, &desiredPosition);
+            MoveObject(position, &desiredPosition, enemyList);
             *position = desiredPosition;
             return false;
         }
@@ -1697,7 +1771,7 @@ bool Fly(Vector2* position)
     return false;
 }
 
-bool FlierStep(Enemy* enemy)
+bool FlierStep(Enemy* enemy, EnemyList *enemyList)
 {
     if (!enemy || !enemy->extraInfo) return false;
 
@@ -1721,9 +1795,9 @@ bool FlierStep(Enemy* enemy)
 
     if (isEmpty(desiredPosition.x, desiredPosition.y))
     {
-        MoveObject(position, &desiredPosition);
+        MoveObject(position, &desiredPosition, enemyList);
         *position = desiredPosition;
-        return Fly(position);
+        return Fly(position, enemyList);
     }
 
     // change direction when blocked
@@ -1732,7 +1806,7 @@ bool FlierStep(Enemy* enemy)
 }
 //==================================================
 
-void SpawnJumper()
+void SpawnJumper(EnemyList *enemyList)
 {
     Vector2 initialPosition = GetRandomEmptyVector();
 
@@ -1743,7 +1817,7 @@ void SpawnJumper()
 
     jumper.extraInfo = new int[jumperInfoSize] {JumperDirectionDefault, JumperVelocityXDefault, JumperVelocityYDefault, JumperCanJumpDefault};
 
-    AddEnemy(&jumper);
+    AddEnemy(&jumper, enemyList);
 }
 
 void TryToJump(Enemy* jumper, int& canJump, Vector2& velocity)
@@ -1760,7 +1834,7 @@ void TryToJump(Enemy* jumper, int& canJump, Vector2& velocity)
     }
 }
 
-bool JumperStep(Enemy* enemy)
+bool JumperStep(Enemy* enemy, EnemyList *enemyList)
 {
     if (!enemy || !enemy->extraInfo) return false;
 
@@ -1782,7 +1856,7 @@ bool JumperStep(Enemy* enemy)
 
     if (isEmpty(desiredPosition.x, desiredPosition.y))
     {
-        MoveObject(position, &desiredPosition);
+        MoveObject(position, &desiredPosition, enemyList);
         *position = desiredPosition;
     }
     else
@@ -1793,7 +1867,7 @@ bool JumperStep(Enemy* enemy)
     TryToJump(enemy, canJump, velocity);
 
     GravityStep(&vector_down, &velocity, position, (int&)canJump);
-    MoveEnemy(&velocity, position);
+    MoveEnemy(&velocity, position, enemyList);
 
     enemy->extraInfo[JumperDirectionIndex] = direction;
     enemy->extraInfo[JumperVelocityXIndex] = velocity.x;
@@ -1825,14 +1899,16 @@ const int moveWarningTimerCrusher = 3;
 const char* CrusherMoveWarningOutput = "!!!\n!!!\n!!!";
 
 
-void SpawnCrusher()
+void SpawnCrusher(EnemyList *enemyList)
 {
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     Enemy boss = CrusherBlueprint;
 
     boss.position = GetRandomEmptyVector(bossSize);
     boss.extraInfo = new int[6] {0, -1, 0, 0, 0, currentEnemiesAlive};
 
-    AddSpecialEnemy(&boss, bossSize);
+    AddSpecialEnemy(&boss, bossSize, enemyList);
     cout << currentEnemiesAlive;
 }
 
@@ -1907,7 +1983,7 @@ void CrusherChooseNewSquareMovePosition(Enemy* boss)
     boss->extraInfo[bossChosenPositionYIndex] = position.y;
 }
 
-void MovePlayerToSafety()
+void MovePlayerToSafety(EnemyList *enemyList)
 {
     if (!player.position) return;
 
@@ -1920,7 +1996,7 @@ void MovePlayerToSafety()
 
     *player.position = newPosition;
 
-    VisualizePlayer();
+    VisualizePlayer(enemyList);
 }
 
 void CrusherChooseNewBehaviour(Enemy* boss)
@@ -1941,7 +2017,7 @@ void CrusherChooseNewBehaviour(Enemy* boss)
     boss->extraInfo[bossBehaviourIndex] = behaviour;
 }
 
-bool MoveCrusher(Enemy* boss)
+bool MoveCrusher(Enemy* boss, EnemyList *enemyList)
 {
     if (!boss) return false;
 
@@ -1951,17 +2027,17 @@ bool MoveCrusher(Enemy* boss)
         boss->extraInfo[bossChosenPositionYIndex]
     };
 
-    MoveSpecial(boss, &desiredPosition, bossSize);
+    MoveSpecial(boss, &desiredPosition, bossSize, enemyList);
     bool hit = DidSpecialEnemyHitPlayer(boss);
 
     if (hit)
     {
-        MovePlayerToSafety();
+        MovePlayerToSafety(enemyList);
     }
     return hit;
 }
 
-void AddAnimationWarningCrusher(Enemy* boss)
+void AddAnimationWarningCrusher(Enemy* boss, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return;
 
@@ -1978,10 +2054,10 @@ void AddAnimationWarningCrusher(Enemy* boss)
     warning.output = (char*)CrusherMoveWarningOutput;
     warning.position = warningPosition;
 
-    AddAnimation(&warning);
+    AddAnimation(&warning, animationList, enemyList);
 }
 
-bool SquareMovePhaseCrusher(Enemy* boss)
+bool SquareMovePhaseCrusher(Enemy* boss, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return false;
 
@@ -1990,7 +2066,7 @@ bool SquareMovePhaseCrusher(Enemy* boss)
     {
         boss->extraInfo[bossOngoingIndex] = false;
         boss->extraInfo[bossTimerIndex] = 0;
-        return MoveCrusher(boss);
+        return MoveCrusher(boss, enemyList);
     }
     else
     {
@@ -1998,7 +2074,7 @@ bool SquareMovePhaseCrusher(Enemy* boss)
 
         if (timer % moveWarningTimerCrusher == 1)
         {
-            AddAnimationWarningCrusher(boss);
+            AddAnimationWarningCrusher(boss, animationList, enemyList);
         }
 
         return false;
@@ -2010,7 +2086,7 @@ void ExpandSpecial(Enemy* enemy, int wantedSize, int index)
     DrawSpecialEnemy(enemy, wantedSize, index);
 }
 
-bool ExpandCrusher(Enemy* boss)
+bool ExpandCrusher(Enemy* boss, EnemyList *enemyList)
 {
     if (!boss) return false;
 
@@ -2023,7 +2099,7 @@ bool ExpandCrusher(Enemy* boss)
 
     if (hit)
     {
-        MovePlayerToSafety();
+        MovePlayerToSafety(enemyList);
     }
     return hit;
 }
@@ -2038,7 +2114,7 @@ void ShrinkCrusher(Enemy* boss)
     ExpandSpecial(boss, bossSize, index);
 }
 
-bool SquareExpandPhaseCrusher(Enemy* boss)
+bool SquareExpandPhaseCrusher(Enemy* boss, EnemyList *enemyList)
 {
     if (!boss) return false;
 
@@ -2049,7 +2125,7 @@ bool SquareExpandPhaseCrusher(Enemy* boss)
         boss->extraInfo[bossOngoingIndex] = false;
         boss->extraInfo[bossTimerIndex] = 0;
 
-        return ExpandCrusher(boss);
+        return ExpandCrusher(boss, enemyList);
     }
     else
     {
@@ -2078,7 +2154,7 @@ bool SquareShrinkPhaseCrusher(Enemy* boss)
     }
 }
 
-bool CrusherStep(Enemy* enemy)
+bool CrusherStep(Enemy* enemy, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!enemy || !enemy->extraInfo) return false;
 
@@ -2091,9 +2167,9 @@ bool CrusherStep(Enemy* enemy)
         switch (behaviour)
         {
         case SquareMovePhase:
-            return SquareMovePhaseCrusher(enemy);
+            return SquareMovePhaseCrusher(enemy, animationList, enemyList);
         case SquareExpandPhase:
-            return SquareExpandPhaseCrusher(enemy);
+            return SquareExpandPhaseCrusher(enemy, enemyList);
         case SquareShrinkPhase:
             return SquareShrinkPhaseCrusher(enemy);
             break;
@@ -2107,8 +2183,10 @@ bool CrusherStep(Enemy* enemy)
 }
 //====================================================
 
-void SpawnShooter()
+void SpawnShooter(EnemyList *enemyList)
 {
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     Enemy boss = ShooterBlueprint;
 
     boss.position = GetRandomEmptyVector(bossSize);
@@ -2116,7 +2194,7 @@ void SpawnShooter()
 
     boss.extraInfo = new int[7 + strSize] {0, -1, 0, 0, 0, currentEnemiesAlive, 0};
 
-    AddSpecialEnemy(&boss, bossSize);
+    AddSpecialEnemy(&boss, bossSize, enemyList);
     cout << currentEnemiesAlive;
 }
 
@@ -2257,7 +2335,7 @@ void ShooterChooseNewBehaviour(Enemy* boss)
     boss->extraInfo[bossBehaviourIndex] = behaviour;
 }
 
-bool MoveShooter(Enemy* boss)
+bool MoveShooter(Enemy* boss, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return false;
 
@@ -2267,17 +2345,17 @@ bool MoveShooter(Enemy* boss)
         boss->extraInfo[bossChosenPositionYIndex]
     };
 
-    MoveSpecial(boss, &desiredPosition, bossSize);
+    MoveSpecial(boss, &desiredPosition, bossSize, enemyList);
     bool hit = DidSpecialEnemyHitPlayer(boss);
 
     if (hit)
     {
-        MovePlayerToSafety();
+        MovePlayerToSafety(enemyList);
     }
     return hit;
 }
 
-void AddAnimationWarningShooter(Enemy* boss)
+void AddAnimationWarningShooter(Enemy* boss, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return;
 
@@ -2294,7 +2372,7 @@ void AddAnimationWarningShooter(Enemy* boss)
     warning.output = (char*)CrusherMoveWarningOutput;
     warning.position = warningPosition;
 
-    AddAnimation(&warning);
+    AddAnimation(&warning, animationList, enemyList);
 }
 
 void ChangeLetter(char oldLetter, char newLetter, char* str)
@@ -2311,7 +2389,7 @@ void ChangeLetter(char oldLetter, char newLetter, char* str)
     }
 }
 
-bool MovePhaseShooter(Enemy* boss)
+bool MovePhaseShooter(Enemy* boss, AnimationList* animationList, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return false;
     int timer = boss->extraInfo[bossTimerIndex];
@@ -2320,7 +2398,7 @@ bool MovePhaseShooter(Enemy* boss)
         boss->extraInfo[bossOngoingIndex] = false;
         boss->extraInfo[bossTimerIndex] = 0;
 
-        return MoveShooter(boss);
+        return MoveShooter(boss, enemyList);
     }
     else
     {
@@ -2328,7 +2406,7 @@ bool MovePhaseShooter(Enemy* boss)
 
         if (timer % moveWarningTimerCrusher == 1)
         {
-            AddAnimationWarningCrusher(boss);
+            AddAnimationWarningCrusher(boss, animationList, enemyList);
         }
 
         return false;
@@ -2643,7 +2721,7 @@ void AddLineShootingAnimations(Enemy* enemy, char letter)
     Add_down_ShootingAnimation(enemy, distanceDown, letter);
 }
 
-void StartAnimations(Enemy* enemy)
+void StartAnimations(Enemy* enemy, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!enemy) return;
 
@@ -2653,23 +2731,23 @@ void StartAnimations(Enemy* enemy)
 
         if (animation != nullptr)
         {
-            AddAnimation(animation);
+            AddAnimation(animation, animationList, enemyList);
         }
     }
 }
 
-void LaserHit(int boardValue)
+void LaserHit(int boardValue, EnemyList *enemyList)
 {
     if (boardValue == player_index)
     {
         DamagePlayer(1);
-        MovePlayerToSafety();
+        MovePlayerToSafety(enemyList);
     }
 }
 
 const int laserCollisinDuration = 600;
 
-void ShooterShoot(Enemy* enemy)
+void ShooterShoot(Enemy* enemy, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!enemy) return;
 
@@ -2685,12 +2763,12 @@ void ShooterShoot(Enemy* enemy)
 
         if (animation->output) ChangeLetter(warningLetter, laserLetter, animation->output);
 
-        AddAnimation(animation);
-        BuildCollision(animation, LaserHit, laserCollisinDuration);
+        AddAnimation(animation, animationList, enemyList);
+        BuildCollision(animation, LaserHit, laserCollisinDuration, animationList, enemyList);
     }
 }
 
-bool ShootPhaseShooter(Enemy* boss)
+bool ShootPhaseShooter(Enemy* boss, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return false;
 
@@ -2700,7 +2778,7 @@ bool ShootPhaseShooter(Enemy* boss)
         boss->extraInfo[bossOngoingIndex] = false;
         boss->extraInfo[bossTimerIndex] = 0;
 
-        ShooterShoot(boss);
+        ShooterShoot(boss, animationList, enemyList);
         return false;
     }
     else
@@ -2709,7 +2787,7 @@ bool ShootPhaseShooter(Enemy* boss)
 
         if (timer % moveWarningTimerCrusher == 1)
         {
-            StartAnimations(boss);
+            StartAnimations(boss, animationList, enemyList);
         }
 
         return false;
@@ -2738,7 +2816,7 @@ bool WaitShooter(Enemy* boss)
     }
 }
 
-bool ShootLinePhaseShooter(Enemy* boss)
+bool ShootLinePhaseShooter(Enemy* boss, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!boss || !boss->extraInfo) return false;
     int timer = boss->extraInfo[bossTimerIndex];
@@ -2747,7 +2825,7 @@ bool ShootLinePhaseShooter(Enemy* boss)
         boss->extraInfo[bossOngoingIndex] = false;
         boss->extraInfo[bossTimerIndex] = 0;
 
-        ShooterShoot(boss);
+        ShooterShoot(boss, animationList, enemyList);
         return false;
     }
     else
@@ -2756,14 +2834,14 @@ bool ShootLinePhaseShooter(Enemy* boss)
 
         if (timer % moveWarningTimerCrusher == 1)
         {
-            StartAnimations(boss);
+            StartAnimations(boss, animationList, enemyList);
         }
 
         return false;
     }
 }
 
-bool ShooterStep(Enemy* enemy)
+bool ShooterStep(Enemy* enemy, AnimationList *animationList, EnemyList *enemyList)
 {
     if (!enemy || !enemy->extraInfo) return false;
 
@@ -2776,15 +2854,15 @@ bool ShooterStep(Enemy* enemy)
         switch (behaviour)
         {
         case MovePhase:
-            return MovePhaseShooter(enemy);
+            return MovePhaseShooter(enemy, animationList, enemyList);
         case ShootDiagonalPhase:
-            return ShootPhaseShooter(enemy);
+            return ShootPhaseShooter(enemy, animationList, enemyList);
             break;
         case ShooterWaitForCleaning1:
             return WaitShooter(enemy);
             break;
         case ShootLinePhase:
-            return ShootLinePhaseShooter(enemy);
+            return ShootLinePhaseShooter(enemy, animationList, enemyList);
             break;
         case ShooterWaitForCleaning2:
             return WaitShooter(enemy);
@@ -2799,7 +2877,7 @@ bool ShooterStep(Enemy* enemy)
 }
 //====================================================
 
-void SpawnEnemy()
+void SpawnEnemy(EnemyList *enemyList)
 {
     int randomEnemy = GenerateRandom(0, enemyTypeCount - 1);
     EnemyTypes enemyType = (EnemyTypes)randomEnemy;
@@ -2807,29 +2885,32 @@ void SpawnEnemy()
     switch (enemyType)
     {
     case Walker:
-        SpawnWalker();
+        SpawnWalker(enemyList);
         break;
     case Crawler:
-        SpawnCrawler();
+        SpawnCrawler(enemyList);
         break;
     case Flier:
-        SpawnFlier();
+        SpawnFlier(enemyList);
         break;
     case Jumper:
-        SpawnJumper();
+        SpawnJumper(enemyList);
         break;
     default:
         break;
     }
 }
 
-void SpawnBoss()
+void SpawnBoss(EnemyList *enemyList)
 {
-    SpawnShooter();
+    SpawnShooter(enemyList);
 }
 
-void EnemiesStep()
+void EnemiesStep(AnimationList *animationList, EnemyList *enemyList)
 {
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     if (!enemiesAlive) return;
 
     for (int i = 0; i < currentEnemiesAlive; i++)
@@ -2840,22 +2921,22 @@ void EnemiesStep()
         switch (currentType)
         {
         case EnemyTypes::Walker:
-            hit = WalkerStep(enemiesAlive + i);
+            hit = WalkerStep(enemiesAlive + i, enemyList);
             break;
         case Crawler:
-            hit = CrawerStep(enemiesAlive + i);
+            hit = CrawerStep(enemiesAlive + i, enemyList);
             break;
         case Flier:
-            hit = FlierStep(enemiesAlive + i);
+            hit = FlierStep(enemiesAlive + i, enemyList);
             break;
         case Jumper:
-            hit = JumperStep(enemiesAlive + i);
+            hit = JumperStep(enemiesAlive + i, enemyList);
             break;
         case Crusher:
-            hit = CrusherStep(enemiesAlive + i);
+            hit = CrusherStep(enemiesAlive + i, animationList, enemyList);
             break;
         case Shooter:
-            hit = ShooterStep(enemiesAlive + i);
+            hit = ShooterStep(enemiesAlive + i, animationList, enemyList);
             break;
         default:
             break;
@@ -2864,38 +2945,41 @@ void EnemiesStep()
         if (hit)
         {
             DamagePlayer(1);
-            if (!isBoss(i))
+            if (!isBoss(i, enemyList))
             {
-                RemoveEnemy(i);
+                RemoveEnemy(i, enemyList);
                 i--; // adjust index after removal
             }
         }
     }
 }
 
-void SpawnWave(int numOfEnemies)
+void SpawnWave(int numOfEnemies, EnemyList *enemyList)
 {
     for (int i = 0; i < numOfEnemies; i++)
     {
-        SpawnEnemy();
+        SpawnEnemy(enemyList);
     }
 }
 
-void SpawnFirstWave()
+void SpawnFirstWave(EnemyList *enemyList)
 {
-    SpawnWalker();
-    SpawnFlier();
-    SpawnCrawler();
-    SpawnJumper();
-    SpawnWalker();
+    SpawnWalker(enemyList);
+    SpawnFlier(enemyList);
+    SpawnCrawler(enemyList);
+    SpawnJumper(enemyList);
+    SpawnWalker(enemyList);
 }
 
 /*
  * DamageEnemy
  * Reduce HP of enemy at index; validate inputs.
  */
-void DamageEnemy(int enemyIndex, int amount)
+void DamageEnemy(int enemyIndex, int amount, EnemyList *enemyList)
 {
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
     if (!enemiesAlive) return;
     if (enemyIndex < 0 || enemyIndex >= currentEnemiesAlive) return;
 
@@ -2904,7 +2988,7 @@ void DamageEnemy(int enemyIndex, int amount)
 
     if (e->HP <= 0)
     {
-        RemoveEnemy(enemyIndex);
+        RemoveEnemy(enemyIndex, enemyList);
     }
 }
 
@@ -2957,7 +3041,7 @@ void PrintHeader()
     cout << endl;
 }
 
-void PrintFullBoard()
+void PrintFullBoard(EnemyList *enemyList)
 {
     if (!board) return;
     PrintHeader();
@@ -2966,7 +3050,7 @@ void PrintFullBoard()
     {
         for (int x = 0; x < width; x++)
         {
-            if (board[x]) PrintObject(board[x][y]);
+            if (board[x]) PrintObject(board[x][y], enemyList);
             else cout << ' ';
         }
         cout << endl;
@@ -3010,18 +3094,8 @@ void GenerateShootingSize()
     }
 }
 
-void GameSetup()
+void GameSetup(EnemyList *enemyList)
 {
-    // allocate board columns
-    if (board) // free existing (defensive)
-    {
-        for (int i = 0; i < width; i++)
-        {
-            delete[] board[i];
-        }
-        delete[] board;
-        board = nullptr;
-    }
 
     board = new unsigned char* [width];
     if (!board) return;
@@ -3041,33 +3115,22 @@ void GameSetup()
     GenerateMap();
     AddPlayer();
 
-    if (!enemiesAlive) enemiesAlive = new Enemy[maxEnemiesAllowed];
-
-    vector_down.x = 0;
-    vector_down.y = 1;
-    vector_left.x = -1;
-    vector_left.y = 0;
-    vector_right.x = 1;
-    vector_right.y = 0;
-    vector_up.x = 0;
-    vector_up.y = -1;
-    vector_zero.x = 0;
-    vector_zero.y = 0;
+    enemyList->enemiesAlive = new Enemy[maxEnemiesAllowed];
 
     GenerateShootingSize();
 }
 
-void InputManager(char input)
+void InputManager(char input, AnimationList *animationList, EnemyList *enemyList)
 {
     if (input == 0) return;
 
     if (input == 'a')
     {
-        MovePlayer(&vector_left, player.position);
+        MovePlayer(&vector_left, player.position, enemyList);
     }
     else if (input == 'd')
     {
-        MovePlayer(&vector_right, player.position);
+        MovePlayer(&vector_right, player.position, enemyList);
     }
     else if (input == 'w')
     {
@@ -3075,19 +3138,19 @@ void InputManager(char input)
     }
     else if (input == 'i')
     {
-        tryAttacking(AttackDirections::up, &player);
+        tryAttacking(AttackDirections::up, &player, animationList, enemyList);
     }
     else if (input == 'k')
     {
-        tryAttacking(AttackDirections::down, &player);
+        tryAttacking(AttackDirections::down, &player, animationList, enemyList);
     }
     else if (input == 'l')
     {
-        tryAttacking(AttackDirections::right, &player);
+        tryAttacking(AttackDirections::right, &player, animationList, enemyList);
     }
     else if (input == 'j')
     {
-        tryAttacking(AttackDirections::left, &player);
+        tryAttacking(AttackDirections::left, &player, animationList, enemyList);
     }
 }
 
@@ -3095,23 +3158,26 @@ void InputManager(char input)
  * GameLoop
  * Core game loop. Performs input, physics, AI and animations.
  */
-void GameLoop()
+void GameLoop(AnimationList *animationList, EnemyList *enemyList)
 {
-    PrintFullBoard();
+    Enemy *enemiesAlive = enemyList->enemiesAlive;
+    int &currentEnemiesAlive = enemyList->currentEnemiesAlive;
+
+    PrintFullBoard(enemyList);
     float timer = 0;
     timer += GetDeltaTime();
 
     while (true)
     {
         char input = GetInput();
-        InputManager(input);
+        InputManager(input, animationList, enemyList);
 
         GravityStep(&vector_down, &player.verticalMomentum, player.position, player.jumpsLeft);
-        MovePlayer(&player.verticalMomentum, player.position);
+        MovePlayer(&player.verticalMomentum, player.position, enemyList);
         if(lost)return;
 
-        EnemiesStep();
-        AnimationCollisionCheck();
+        EnemiesStep(animationList, enemyList);
+        AnimationCollisionCheck(animationList, enemyList);
         if(lost)return;
 
         if (currentEnemiesAlive == 0) break;
@@ -3121,7 +3187,7 @@ void GameLoop()
             float delta = GetDeltaTime();
             timer += delta;
 
-            AnimatinStep((int)delta);
+            AnimatinStep((int)delta, animationList, enemyList);
         }
         timer = 0;
     }
@@ -3166,37 +3232,36 @@ void GenerateSeed()
 
 int main()
 {
+    AnimationList animationList;
+    EnemyList enemyList;
+
     GenerateSeed();
-    GameSetup();
+    GameSetup(&enemyList);
     //PrintFullBoard();
     int curWaveNumber = initialWaveNumber;
 
-    SpawnFirstWave();
-    GameLoop();
+    SpawnFirstWave(&enemyList);
+    GameLoop(&animationList, &enemyList);
     curWaveNumber += GenerateRandom(3, 5);
 
     for (int i = 0; i < numberOfWaves - 1; i++)
     {
-        if(lost)
-        {
+        if(lost){
             GAMEOVER();
             return 0;
         }
-        SpawnWave(curWaveNumber);
+        SpawnWave(curWaveNumber, &enemyList);
 
-        GameLoop();
+        GameLoop(&animationList, &enemyList);
 
         curWaveNumber += GenerateRandom(3, 5);
-        if(lost)
-        {
+        if(lost){
             GAMEOVER();
             return 0;
         }
     }
-    SpawnBoss();
-    GameLoop();
-    if(lost)
-    {
+    GameLoop(&animationList, &enemyList);
+    if(lost){
         GAMEOVER();
         return 0;
     }
